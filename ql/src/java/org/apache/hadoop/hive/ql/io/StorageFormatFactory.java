@@ -28,8 +28,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import com.google.common.collect.ImmutableMap;
+import org.apache.hadoop.hive.conf.Validator;
 
-public class StorageFormatFactory {
+public class StorageFormatFactory implements Validator {
   private static final Log LOG = LogFactory.getLog(StorageFormatFactory.class);
 
   private final Map<String, StorageFormatDescriptor> storageFormats;
@@ -54,5 +55,18 @@ public class StorageFormatFactory {
   public @Nullable StorageFormatDescriptor get(String name) {
     name = name.trim().toUpperCase();
     return storageFormats.get(name);
+  }
+
+  @Override
+  public String validate(String value) {
+    if (value == null || get(value.toUpperCase()) == null) {
+      return "Invalid value.. expects one of " + storageFormats.keySet();
+    }
+    return null;
+  }
+
+  @Override
+  public String toDescription() {
+    return "Expects one of " + storageFormats.keySet();
   }
 }

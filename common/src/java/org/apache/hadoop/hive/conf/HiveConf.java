@@ -41,6 +41,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.common.classification.InterfaceAudience.LimitedPrivate;
 import org.apache.hadoop.hive.conf.Validator.PatternSet;
 import org.apache.hadoop.hive.conf.Validator.RangeValidator;
@@ -830,14 +831,16 @@ public class HiveConf extends Configuration {
         "when using UDTF's to prevent the task getting killed because of inactivity.  Users should be cautious \n" +
         "because this may prevent TaskTracker from killing tasks with infinite loops."),
 
-    HIVEDEFAULTFILEFORMAT("hive.default.fileformat", "TextFile", new StringSet("TextFile", "SequenceFile", "RCfile", "ORC"),
+    HIVEDEFAULTFILEFORMAT("hive.default.fileformat", "TextFile",
+        JavaUtils.newInstance("org.apache.hadoop.hive.ql.io.StorageFormatFactory", Validator.class),
         "Default file format for CREATE TABLE statement. Users can explicitly override it by CREATE TABLE ... STORED AS [FORMAT]"),
     HIVEDEFAULTMANAGEDFILEFORMAT("hive.default.fileformat.managed", "none",
 	new StringSet("none", "TextFile", "SequenceFile", "RCfile", "ORC"),
 	"Default file format for CREATE TABLE statement applied to managed tables only. External tables will be \n" +
 	"created with format specified by hive.default.fileformat. Leaving this null will result in using hive.default.fileformat \n" +
 	"for all tables."),
-    HIVEQUERYRESULTFILEFORMAT("hive.query.result.fileformat", "TextFile", new StringSet("TextFile", "SequenceFile", "RCfile"),
+    HIVEQUERYRESULTFILEFORMAT("hive.query.result.fileformat", "TextFile",
+        JavaUtils.newInstance("org.apache.hadoop.hive.ql.io.StorageFormatFactory", Validator.class),
         "Default file format for storing result of the query."),
     HIVECHECKFILEFORMAT("hive.fileformat.check", true, "Whether to check file format or not when loading data files"),
 

@@ -132,7 +132,7 @@
         </dependency>
       </dependencies>
     </profile>
-   <profile>
+    <profile>
       <id>hadoop-2</id>
       <dependencies>
         <dependency>
@@ -148,35 +148,6 @@
           <optional>true</optional>
         </dependency>
       </dependencies>
-    </profile>
-
-    <profile>
-      <id>dist</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-antrun-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>generate-template</id>
-                <phase>package</phase>
-                <configuration>
-                  <target>
-                    <property name="compile.classpath" refid="maven.runtime.classpath"/>
-                    <taskdef name="templategen" classname="org.apache.hadoop.hive.ant.GenHiveTemplate"
-                             classpath="${compile.classpath}"/>
-                    <templategen templateFile="${basedir}/../conf/hive-default.xml.template"/>
-                  </target>
-                </configuration>
-                <goals>
-                  <goal>run</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
     </profile>
   </profiles>
 

@@ -54,6 +54,15 @@ public final class JavaUtils {
     }
   }
 
+  public static <T> T newInstance(String className, Class<T> clazz) {
+    try {
+      return clazz.cast(getClassLoader().loadClass(className).newInstance());
+    } catch (Exception e) {
+      LOG.info("Failed to instantiate " + className, e);
+      return null;
+    }
+  }
+
   /**
    * Standard way of getting classloader in Hive code (outside of Hadoop).
    * 

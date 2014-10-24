@@ -42,6 +42,7 @@ public interface StorageFormatDescriptor {
   String getOutputFormat();
   /**
    * Return the name of the serde as a string or null
+   * For null value, uses default serde (hive.default.serde or hive.default.rcfile.serde)
    */
   @Nullable String getSerde();
 

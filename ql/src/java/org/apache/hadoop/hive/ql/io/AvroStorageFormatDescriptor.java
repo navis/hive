@@ -20,8 +20,6 @@ package org.apache.hadoop.hive.ql.io;
 
 
 import com.google.common.collect.ImmutableSet;
-import org.apache.hadoop.hive.ql.io.AbstractStorageFormatDescriptor;
-import org.apache.hadoop.hive.ql.io.IOConstants;
 import org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat;
 import org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat;
 import org.apache.hadoop.hive.serde2.avro.AvroSerDe;
