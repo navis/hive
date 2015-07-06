@@ -2842,7 +2842,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
     Map<Integer, ExprNodeDesc> hashes = new HashMap<Integer, ExprNodeDesc>();
     if (input instanceof FilterOperator) {
-      ExprNodeDescUtils.getExprNodeColumnDesc(Arrays.asList(((FilterDesc)input.getConf()).getPredicate()), hashes);
+      ExprNodeDescUtils.getExprNodeColumnDesc(Arrays.asList(((FilterDesc) input.getConf()).getPredicate()), hashes);
     }
     ExprNodeDesc filterPred = null;
     List<Boolean> nullSafes = joinTree.getNullSafes();
@@ -2888,7 +2888,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Created Filter Plan for " + qb.getId() + " row schema: "
-          + inputRR.toString());
+              + inputRR.toString());
     }
     return output;
   }
@@ -5113,11 +5113,11 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       // Note that partitioning fields dont need to change, since it is either
       // partitioned randomly, or by all grouping keys + distinct keys
       processGroupingSetReduceSinkOperator(
-          reduceSinkInputRowResolver2,
-          reduceSinkOutputRowResolver2,
-          reduceKeys,
-          outputColumnNames,
-          colExprMap);
+              reduceSinkInputRowResolver2,
+              reduceSinkOutputRowResolver2,
+              reduceKeys,
+              outputColumnNames,
+              colExprMap);
     }
 
     // Get partial aggregation results and store in reduceValues
@@ -6766,7 +6766,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // MetadataTypedColumnsetSerDe does not need type conversions because it
     // does the conversion to String by itself.
     boolean isMetaDataSerDe = table_desc.getDeserializerClass().equals(
-        MetadataTypedColumnsetSerDe.class);
+            MetadataTypedColumnsetSerDe.class);
     boolean isLazySimpleSerDe = table_desc.getDeserializerClass().equals(
         LazySimpleSerDe.class);
     if (!isMetaDataSerDe && !deleting()) {
@@ -8031,7 +8031,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     joinTree.setBaseSrc(children);
     joinTree.setId(qb.getId());
     joinTree.getAliasToOpInfo().put(
-        getModifiedAlias(qb, rightalias), aliasToOpInfo.get(rightalias));
+            getModifiedAlias(qb, rightalias), aliasToOpInfo.get(rightalias));
     // remember rhs table for semijoin
     if (joinTree.getNoSemiJoin() == false) {
       joinTree.addRHSSemijoin(rightalias);
@@ -8484,14 +8484,26 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   // D can be merged with A-B into single join If and only if C and D has same join type
   // In this case, A-B-D join will be executed first and ABD-C join will be executed in next
   private void mergeJoinTree(QB qb) {
+    if (conf.getBoolean("hive.disable.jointree.merge", false)) {
+      return;
+    }
     QBJoinTree tree = qb.getQbJoinTree();
     if (tree.getJoinSrc() == null) {
       return;
     }
+    boolean disableOuterJoinMerge = conf.getBoolean("hive.disable.jointree.merge.outer", false);
     // make array with QBJoinTree : outer most(0) --> inner most(n)
     List<QBJoinTree> trees = new ArrayList<QBJoinTree>();
     for (;tree != null; tree = tree.getJoinSrc()) {
       trees.add(tree);
+      if (disableOuterJoinMerge) {
+        JoinType currType = getType(tree.getJoinCond());
+        if (currType == JoinType.LEFTOUTER ||
+            currType == JoinType.RIGHTOUTER ||
+            currType == JoinType.FULLOUTER) {
+          return;
+        }
+      }
     }
     // merging from 'target'(inner) to 'node'(outer)
     for (int i = trees.size() - 1; i >= 0; i--) {

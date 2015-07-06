@@ -30,6 +30,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.Context;
@@ -104,6 +106,8 @@ import org.apache.hadoop.hive.ql.plan.ReduceWork;
  * make current task depends on this new generated task
  */
 public class CommonJoinTaskDispatcher extends AbstractJoinTaskDispatcher implements Dispatcher {
+
+  private static final Log LOG = LogFactory.getLog(CommonJoinTaskDispatcher.class.getName());
 
   HashMap<String, Long> aliasToSize = null;
 
@@ -414,6 +418,8 @@ public class CommonJoinTaskDispatcher extends AbstractJoinTaskDispatcher impleme
       Set<Integer> bigTableCandidates = MapJoinProcessor.getBigTableCandidates(joinDesc
           .getConds());
 
+      LOG.warn("bigTableCandidates --> " + bigTableCandidates);
+
       // no table could be the big table; there is no need to convert
       if (bigTableCandidates.isEmpty()) {
         return null;
@@ -434,6 +440,8 @@ public class CommonJoinTaskDispatcher extends AbstractJoinTaskDispatcher impleme
         // This is the threshold that the user has specified to fit in mapjoin
         long mapJoinSize = HiveConf.getLongVar(conf,
             HiveConf.ConfVars.HIVECONVERTJOINNOCONDITIONALTASKTHRESHOLD);
+        LOG.warn("TRY HIVECONVERTJOINNOCONDITIONALTASKTHRESHOLD : " + mapJoinSize);
+        LOG.warn("---- aliasToSize : " + aliasToSize);
 
         Long bigTableSize = null;
         Set<String> aliases = aliasToWork.keySet();
@@ -441,6 +449,7 @@ public class CommonJoinTaskDispatcher extends AbstractJoinTaskDispatcher impleme
           Operator<?> parent = joinOp.getParentOperators().get(tablePosition);
           Set<String> participants = GenMapRedUtils.findAliases(currWork, parent);
           long sumOfOthers = Utilities.sumOfExcept(aliasToSize, aliases, participants);
+          LOG.warn(" -- parent : " + parent + ", participants : " + participants + "::: sumOfOthers => " + sumOfOthers);
           if (sumOfOthers < 0 || sumOfOthers > mapJoinSize) {
             continue; // some small alias is not known or too big
           }
@@ -448,6 +457,7 @@ public class CommonJoinTaskDispatcher extends AbstractJoinTaskDispatcher impleme
             continue; // prefer right most alias
           }
           long aliasSize = Utilities.sumOf(aliasToSize, participants);
+          LOG.warn(" -- parent : " + parent + ", participants : " + participants + "::: sumOf => " + aliasSize);
           if (bigTableSize == null || bigTableSize < 0 || (aliasSize >= 0 && aliasSize >= bigTableSize)) {
             bigTablePosition = tablePosition;
             bigTableSize = aliasSize;
@@ -460,6 +470,7 @@ public class CommonJoinTaskDispatcher extends AbstractJoinTaskDispatcher impleme
       currWork.setMapAliases(joinOp.getConf().getMapAliases());
 
       if (bigTablePosition >= 0) {
+        LOG.warn(" -- ELECTED : bigTablePosition : " + bigTablePosition + ":" + joinOp.getParentOperators().get(bigTablePosition));
         // create map join task and set big table as bigTablePosition
         MapRedTask newTask = convertTaskToMapJoinTask(currTask.getWork(), bigTablePosition);
 

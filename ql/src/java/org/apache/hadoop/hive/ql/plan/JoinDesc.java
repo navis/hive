@@ -630,4 +630,22 @@ public class JoinDesc extends AbstractOperatorDesc {
     streamAliases = joinDesc.streamAliases == null ? null : new ArrayList<String>(joinDesc.streamAliases);
   }
 
+  @Override
+  public String toString() {
+    StringBuilder b = new StringBuilder(super.toString());
+    b.append(leftAliases == null ? "[]" : Arrays.toString(leftAliases));
+    b.append(rightAliases == null ? "[]" : Arrays.toString(rightAliases));
+    return b.toString();
+  }
+
+  public String[] joinAliases() {
+    String[] aliases = new String[1 + (rightAliases == null ? 1 : rightAliases.length)];
+    if (leftAliases != null) {
+      aliases[0] = Arrays.toString(leftAliases);
+    }
+    if (rightAliases != null) {
+      System.arraycopy(rightAliases, 0, aliases, 1, rightAliases.length);
+    }
+    return aliases;
+  }
 }

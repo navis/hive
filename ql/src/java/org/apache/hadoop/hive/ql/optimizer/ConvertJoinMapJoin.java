@@ -494,6 +494,7 @@ public class ConvertJoinMapJoin implements NodeProcessor {
 
   public int getMapJoinConversionPos(JoinOperator joinOp, OptimizeTezProcContext context,
       int buckets) throws SemanticException {
+    JoinDesc conf = joinOp.getConf();
     /*
      * HIVE-9038: Join tests fail in tez when we have more than 1 join on the same key and there is
      * an outer join down the join tree that requires filterTag. We disable this conversion to map
@@ -501,99 +502,73 @@ public class ConvertJoinMapJoin implements NodeProcessor {
      * new operation to be able to support this. This seems like a corner case enough to special
      * case this for now.
      */
-    if (joinOp.getConf().getConds().length > 1) {
-      boolean hasOuter = false;
-      for (JoinCondDesc joinCondDesc : joinOp.getConf().getConds()) {
+//    if (conf.getConds().length > 1 && conf.getFilterMapString() != null) {
+    if (conf.getConds().length > 1 && conf.getFilterMap() != null) {
+      for (JoinCondDesc joinCondDesc : conf.getConds()) {
         switch (joinCondDesc.getType()) {
-        case JoinDesc.INNER_JOIN:
-        case JoinDesc.LEFT_SEMI_JOIN:
-        case JoinDesc.UNIQUE_JOIN:
-          hasOuter = false;
-          break;
-
         case JoinDesc.FULL_OUTER_JOIN:
         case JoinDesc.LEFT_OUTER_JOIN:
         case JoinDesc.RIGHT_OUTER_JOIN:
-          hasOuter = true;
-          break;
-
-        default:
-          throw new SemanticException("Unknown join type " + joinCondDesc.getType());
+          return -1;
         }
-      }
-      if (hasOuter) {
-        return -1;
       }
     }
     Set<Integer> bigTableCandidateSet =
-        MapJoinProcessor.getBigTableCandidates(joinOp.getConf().getConds());
+        MapJoinProcessor.getBigTableCandidates(conf.getConds());
+    if (bigTableCandidateSet.isEmpty()) {
+      LOG.warn("Cannot find appropriate candidates for MapJoin : " + joinOp);
+      return -1;
+    }
+    LOG.warn("Candidate set : " + bigTableCandidateSet);
 
     long maxSize = context.conf.getLongVar(
         HiveConf.ConfVars.HIVECONVERTJOINNOCONDITIONALTASKTHRESHOLD);
 
+    LOG.warn("Try Convert to MapJoin " + joinOp +" with hive.auto.convert.join.noconditionaltask.size : " + maxSize);
+
     int bigTablePosition = -1;
 
-    Statistics bigInputStat = null;
+    long bigInputSize = -1;
     long totalSize = 0;
-    int pos = 0;
 
-    // bigTableFound means we've encountered a table that's bigger than the
-    // max. This table is either the the big table or we cannot convert.
-    boolean bigTableFound = false;
-
-    for (Operator<? extends OperatorDesc> parentOp : joinOp.getParentOperators()) {
-
+    String[] aliases = conf.joinAliases();
+    List<Operator<? extends OperatorDesc>> parents = joinOp.getParentOperators();
+    for (int pos = 0; pos < parents.size(); pos++) {
+      boolean candidate = bigTableCandidateSet.contains(pos);
+      Operator<? extends OperatorDesc> parentOp = parents.get(pos);
       Statistics currInputStat = parentOp.getStatistics();
       if (currInputStat == null) {
-        LOG.warn("Couldn't get statistics from: " + parentOp);
+        LOG.warn("!!--- Couldn't get statistics from: " + parentOp + "[" + aliases[pos] + "]");
         return -1;
       }
+      long dataSize = currInputStat.getDataSize();
+      LOG.warn("--- Checking " + (candidate ? "candidate " : "") + parentOp +
+              "[" + aliases[pos] + "] of size " + dataSize);
 
-      long inputSize = currInputStat.getDataSize();
-      if ((bigInputStat == null)
-          || ((bigInputStat != null) && (inputSize > bigInputStat.getDataSize()))) {
-
-        if (bigTableFound) {
-          // cannot convert to map join; we've already chosen a big table
-          // on size and there's another one that's bigger.
-          return -1;
-        }
-
-        if (inputSize/buckets > maxSize) {
-          if (!bigTableCandidateSet.contains(pos)) {
-            // can't use the current table as the big table, but it's too
-            // big for the map side.
-            return -1;
-          }
-
-          bigTableFound = true;
-        }
-
-        if (bigInputStat != null) {
-          // we're replacing the current big table with a new one. Need
-          // to count the current one as a map table then.
-          totalSize += bigInputStat.getDataSize();
-        }
-
-        if (totalSize/buckets > maxSize) {
-          // sum of small tables size in this join exceeds configured limit
-          // hence cannot convert.
-          return -1;
-        }
-
-        if (bigTableCandidateSet.contains(pos)) {
-          bigTablePosition = pos;
-          bigInputStat = currInputStat;
-        }
-      } else {
-        totalSize += currInputStat.getDataSize();
-        if (totalSize/buckets > maxSize) {
-          // cannot hold all map tables in memory. Cannot convert.
-          return -1;
-        }
+      totalSize += dataSize;
+      if (candidate && (bigInputSize < 0 || dataSize > bigInputSize)) {
+        bigInputSize = dataSize;
+        bigTablePosition = pos;
       }
-      pos++;
     }
+
+    if (bigInputSize < 0) {
+      LOG.warn("!!--- Failed to find proper big table for MapJoin");
+      return -1;
+    }
+
+    long smallTables = totalSize - bigInputSize;
+
+    if (smallTables / buckets > maxSize) {
+      // sum of small tables size in this join exceeds configured limit
+      // hence cannot convert.
+      LOG.warn("!!--- Failed to convert to MapJoin : total size of small tables " + smallTables + " exceeds " + maxSize);
+      return -1;
+    }
+
+    LOG.warn("!!--- Big table : " + bigTablePosition + ":" +
+            parents.get(bigTablePosition) +
+            " of size " + bigInputSize + " : total size of small tables " + smallTables);
 
     return bigTablePosition;
   }
