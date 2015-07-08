@@ -46,6 +46,7 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Pattern;
 
 import com.google.common.collect.Iterables;
 import org.apache.commons.lang.StringEscapeUtils;
@@ -1897,6 +1898,41 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
    */
   private int showCreateTable(Hive db, ShowCreateTableDesc showCreateTbl) throws HiveException {
     // get the create table statement for the table and populate the output
+    Path resFile = new Path(showCreateTbl.getResFile());
+
+    DataOutputStream outStream = outputStream(resFile);
+    String tableName = showCreateTbl.getTableName();
+    try {
+      if (tableName.startsWith("@")) {
+        Map<String, List<String>> targets = DDLSemanticAnalyzer.getTargets(tableName, db);
+        for (Map.Entry<String, List<String>> entry : targets.entrySet()) {
+          String database = entry.getKey();
+          outStream.writeBytes("CREATE DATABASE IF NOT EXISTS `" + database + "`;\n");
+          for (String table : entry.getValue()) {
+            showCreate(db, outStream, database + "." + table);
+            outStream.writeBytes(";\n");
+          }
+        }
+        return 0;
+      }
+      return showCreate(db, outStream, tableName);
+    } catch (IOException e) {
+      throw new HiveException(e);
+    } finally {
+      IOUtils.closeStream(outStream);
+    }
+  }
+
+  private DataOutputStream outputStream(Path resFile) throws HiveException {
+    try {
+      FileSystem fs = resFile.getFileSystem(conf);
+      return fs.create(resFile);
+    } catch (IOException e) {
+      throw new HiveException(e);
+    }
+  }
+
+  private int showCreate(Hive db, DataOutputStream outStream, String tableName) throws HiveException {
     final String EXTERNAL = "external";
     final String TEMPORARY = "temporary";
     final String LIST_COLUMNS = "columns";
@@ -1909,22 +1945,14 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
     boolean needsLocation = true;
     StringBuilder createTab_str = new StringBuilder();
 
-    String tableName = showCreateTbl.getTableName();
     Table tbl = db.getTable(tableName, false);
-    DataOutputStream outStream = null;
     List<String> duplicateProps = new ArrayList<String>();
     try {
-      Path resFile = new Path(showCreateTbl.getResFile());
-      FileSystem fs = resFile.getFileSystem(conf);
-      outStream = fs.create(resFile);
-
       needsLocation = doesTableNeedLocation(tbl);
 
       if (tbl.isView()) {
         String createTab_stmt = "CREATE VIEW `" + tableName + "` AS " + tbl.getViewExpandedText();
         outStream.writeBytes(createTab_stmt.toString());
-        outStream.close();
-        outStream = null;
         return 0;
       }
 
@@ -2108,8 +2136,6 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
       createTab_stmt.add(TBL_PROPERTIES, tbl_properties);
 
       outStream.writeBytes(createTab_stmt.render());
-      outStream.close();
-      outStream = null;
     } catch (FileNotFoundException e) {
       LOG.info("show create table: " + stringifyException(e));
       return 1;
@@ -2118,8 +2144,6 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
       return 1;
     } catch (Exception e) {
       throw new HiveException(e);
-    } finally {
-      IOUtils.closeStream(outStream);
     }
 
     return 0;
