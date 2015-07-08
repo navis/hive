@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.antlr.runtime.tree.CommonTree;
 import org.antlr.runtime.tree.Tree;
@@ -2125,15 +2126,60 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
     String tableName = getUnescapedName((ASTNode)ast.getChild(0));
     showCreateTblDesc = new ShowCreateTableDesc(tableName, ctx.getResFile().toString());
 
-    Table tab = getTable(tableName);
-    if (tab.getTableType() == org.apache.hadoop.hive.metastore.TableType.INDEX_TABLE) {
-      throw new SemanticException(ErrorMsg.SHOW_CREATETABLE_INDEX.getMsg(tableName
-          + " has table type INDEX_TABLE"));
+    if (tableName.startsWith("@")) {
+      Map<String, List<String>> targets;
+      try {
+        targets = DDLSemanticAnalyzer.getTargets(tableName, db);
+      } catch (HiveException e) {
+        throw new SemanticException(e);
+      }
+      for (Map.Entry<String, List<String>> entry : targets.entrySet()) {
+        String database = entry.getKey();
+        for (String table : entry.getValue()) {
+          Table tab = getTable(database, table, false);
+          if (tab != null) {
+            inputs.add(new ReadEntity(tab));
+          }
+        }
+      }
+    } else {
+      Table tab = getTable(tableName);
+      if (tab.getTableType() == org.apache.hadoop.hive.metastore.TableType.INDEX_TABLE) {
+        throw new SemanticException(ErrorMsg.SHOW_CREATETABLE_INDEX.getMsg(tableName
+            + " has table type INDEX_TABLE"));
+      }
+      inputs.add(new ReadEntity(tab));
     }
-    inputs.add(new ReadEntity(tab));
     rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(),
         showCreateTblDesc), conf));
     setFetchTask(createFetchTask(showCreateTblDesc.getSchema()));
+  }
+
+  public static Map<String, List<String>> getTargets(String tableName, Hive db) throws HiveException {
+    String[] expression = tableName.substring(1).split("\\.");
+    Pattern databasePattern = null;
+    Pattern tablePattern = null;
+    if (!expression[0].equals("*")) {
+      databasePattern = Pattern.compile(expression[0]);
+    }
+    if (!expression[1].equals("*")) {
+      tablePattern = Pattern.compile(expression[1]);
+    }
+    Map<String, List<String>> targets = new LinkedHashMap<String, List<String>>();
+    for (String database : db.getAllDatabases()) {
+      if (databasePattern == null || databasePattern.matcher(database).matches()) {
+        for (String table : db.getAllTables(database)) {
+          if (tablePattern == null || tablePattern.matcher(table).matches()) {
+            List<String> tableNames = targets.get(database);
+            if (tableNames == null) {
+              targets.put(database, tableNames = new ArrayList<String>());
+            }
+            tableNames.add(table);
+          }
+        }
+      }
+    }
+    return targets;
   }
 
   private void analyzeShowDatabases(ASTNode ast) throws SemanticException {
