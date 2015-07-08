@@ -24,6 +24,7 @@ import com.google.common.collect.Maps;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.exec.ColumnInfo;
 import org.apache.hadoop.hive.ql.exec.CommonJoinOperator;
@@ -70,7 +71,9 @@ import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPNotNull;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPNull;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPOr;
 import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
+import org.apache.hadoop.hive.serde2.typeinfo.*;
 
 import java.lang.reflect.Field;
 import java.util.Collections;
@@ -108,6 +111,22 @@ public class StatsRulesProcFactory {
       try {
         // gather statistics for the first time and the attach it to table scan operator
         Statistics stats = StatsUtils.collectStatistics(aspCtx.getConf(), partList, table, tsop);
+        if (tsop.getNeededColumnIDs() != null && !tsop.getNeededColumnIDs().isEmpty()) {
+          int estimatedRowSize = 0;
+          for (FieldSchema fieldSchema : table.getAllCols()) {
+            TypeInfo colType = TypeInfoUtils.getTypeInfoFromTypeString(fieldSchema.getType());
+            estimatedRowSize += estimatedSize(colType);
+          }
+          int estimatedSelectedSize = 0;
+          for (int index : tsop.getNeededColumnIDs()) {
+            FieldSchema fieldSchema = table.getAllCols().get(index);
+            TypeInfo colType = TypeInfoUtils.getTypeInfoFromTypeString(fieldSchema.getType());
+            estimatedSelectedSize += estimatedSize(colType);
+          }
+          float ratio = (float)estimatedSelectedSize / (float)estimatedRowSize;
+          stats.setDataSize((long) (stats.getDataSize() * ratio));
+          stats.setNumRows((long) (stats.getNumRows() * ratio));
+        }
         tsop.setStatistics(stats.clone());
 
         if (isDebugEnabled) {
@@ -122,6 +141,38 @@ public class StatsRulesProcFactory {
       }
       return null;
     }
+  }
+
+  private static int estimatedSize(TypeInfo type) {
+    if (type.getCategory() != ObjectInspector.Category.PRIMITIVE) {
+      return 1024;
+    }
+    switch (((PrimitiveTypeInfo) type).getPrimitiveCategory()) {
+      case BOOLEAN:
+      case BYTE:
+        return 1;
+      case SHORT:
+        return 2;
+      case INT:
+      case FLOAT:
+        return 4;
+      case LONG:
+      case DOUBLE:
+      case TIMESTAMP:
+      case DATE:
+      case INTERVAL_YEAR_MONTH:
+      case INTERVAL_DAY_TIME:
+        return 8;
+      case DECIMAL:
+        return 32;
+      case STRING:
+      case BINARY:
+        return 128;
+      case VARCHAR:
+      case CHAR:
+        return ((BaseCharTypeInfo) type).getLength();
+    }
+    return 0;
   }
 
   /**
