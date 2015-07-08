@@ -80,8 +80,12 @@ abstract public class AbstractBucketJoinProc implements NodeProcessor {
       Path location, ParseContext pGraphContext) throws SemanticException {
     List<String> fileNames = new ArrayList<String>();
     try {
+      Path f = new Path(location.toString());
       FileSystem fs = location.getFileSystem(pGraphContext.getConf());
-      FileStatus[] files = fs.listStatus(new Path(location.toString()), FileUtils.HIDDEN_FILES_PATH_FILTER);
+      if (!fs.exists(f)) {
+        return Collections.emptyList();
+      }
+      FileStatus[] files = fs.listStatus(f, FileUtils.HIDDEN_FILES_PATH_FILTER);
       if (files != null) {
         for (FileStatus file : files) {
           fileNames.add(file.getPath().toString());

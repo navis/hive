@@ -988,8 +988,10 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
     // multi-threaded file statuses and split strategy
     for (Path dir : getInputPaths(conf)) {
       FileSystem fs = dir.getFileSystem(conf);
-      FileGenerator fileGenerator = new FileGenerator(context, fs, dir);
-      pathFutures.add(context.threadPool.submit(fileGenerator));
+      if (fs.exists(dir)) {
+        FileGenerator fileGenerator = new FileGenerator(context, fs, dir);
+        pathFutures.add(context.threadPool.submit(fileGenerator));
+      }
     }
 
     // complete path futures and schedule split generation
