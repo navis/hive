@@ -316,7 +316,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
       return;
     }
 
-    LOG.info("ORC pushdown predicate: " + sarg);
+    LOG.warn("ORC pushdown predicate: " + sarg);
     options.searchArgument(sarg, getSargColumnNames(
         columnNamesString.split(","), types, options.getInclude(), isOriginal));
   }
@@ -771,6 +771,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
      */
     OrcSplit createSplit(long offset, long length,
                      ReaderImpl.FileMetaInfo fileMetaInfo) throws IOException {
+      LOG.warn("---- createSplit " + offset + "~" + (offset + length));
       String[] hosts;
       Map.Entry<Long, BlockLocation> startEntry = locations.floorEntry(offset);
       BlockLocation start = startEntry.getValue();
@@ -834,6 +835,11 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
     @Override
     public List<OrcSplit> call() throws IOException {
       populateAndCacheStripeDetails();
+      long threshold = context.maxSize >> 2;
+      if (fileMetaInfo.compressionType != null && !fileMetaInfo.compressionType.isEmpty()) {
+        threshold >>= 2;
+      }
+      LOG.warn("Start SplitGenerator.call :: try " + file + " split with threshold " + threshold);
       List<OrcSplit> splits = Lists.newArrayList();
 
       // figure out which stripes we need to read
@@ -880,6 +886,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
       long currentLength = 0;
       int idx = -1;
       for (StripeInformation stripe : stripes) {
+        LOG.warn("-- SplitGenerator "  + stripe);
         idx++;
 
         if (!includeStripe[idx]) {
@@ -906,7 +913,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
           currentLength =
               (stripe.getOffset() + stripe.getLength()) - currentOffset;
         }
-        if (currentLength >= context.maxSize) {
+        if (currentLength >= threshold) {
           splits.add(createSplit(currentOffset, currentLength, fileMetaInfo));
           currentOffset = -1;
         }
@@ -927,17 +934,17 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
       projColsUncompressedSize = orcReader.getRawDataSizeOfColumns(projCols);
       if (fileInfo != null) {
         stripes = fileInfo.stripeInfos;
-        fileMetaInfo = fileInfo.fileMetaInfo;
-        metadata = fileInfo.metadata;
-        types = fileInfo.types;
-        writerVersion = fileInfo.writerVersion;
         // For multiple runs, in case sendSplitsInFooter changes
-        if (fileMetaInfo == null && context.footerInSplits) {
+        if (fileInfo.fileMetaInfo == null && context.footerInSplits) {
           fileInfo.fileMetaInfo = ((ReaderImpl) orcReader).getFileMetaInfo();
           fileInfo.metadata = orcReader.getMetadata();
           fileInfo.types = orcReader.getTypes();
           fileInfo.writerVersion = orcReader.getWriterVersion();
         }
+        fileMetaInfo = fileInfo.fileMetaInfo;
+        metadata = fileInfo.metadata;
+        types = fileInfo.types;
+        writerVersion = fileInfo.writerVersion;
       } else {
         stripes = orcReader.getStripes();
         metadata = orcReader.getMetadata();

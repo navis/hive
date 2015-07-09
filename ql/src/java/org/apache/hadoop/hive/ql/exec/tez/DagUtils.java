@@ -109,6 +109,7 @@ import org.apache.tez.dag.api.TezException;
 import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.dag.api.Vertex;
 import org.apache.tez.dag.api.VertexGroup;
+import org.apache.tez.dag.api.VertexLocationHint;
 import org.apache.tez.dag.api.VertexManagerPluginDescriptor;
 import org.apache.tez.dag.library.vertexmanager.ShuffleVertexManager;
 import org.apache.tez.mapreduce.hadoop.MRHelpers;
@@ -624,6 +625,9 @@ public class DagUtils {
     if (mapWork instanceof MergeFileWork) {
       procClassName = MergeFileTezProcessor.class.getName();
     }
+    VertexLocationHint locationHint = dataSource.getLocationHint();
+    LOG.warn("DAG : " + mapWork.getName() + " --> " + numTasks +
+            (locationHint != null && locationHint.getTaskLocationHints() != null ? locationHint.getTaskLocationHints().size() : ""));
     map = Vertex.create(mapWork.getName(), ProcessorDescriptor.create(procClassName)
         .setUserPayload(serializedConf), numTasks, getContainerResource(conf));
 
