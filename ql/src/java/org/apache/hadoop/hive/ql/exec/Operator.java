@@ -1382,7 +1382,7 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
     }
     for (int i = 0; i < numChild; i++) {
       Operator<?> child = childOperators.get(i);
-      if (visited.add(child)) {
+      if (!(child instanceof ReduceSinkOperator) && visited.add(child)) {
         overhead += child.calculateOverhead(visited);
       }
     }

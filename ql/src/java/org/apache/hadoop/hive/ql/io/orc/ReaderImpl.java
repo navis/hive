@@ -638,6 +638,9 @@ public class ReaderImpl implements Reader {
   private List<Integer> getColumnIndicesFromNames(List<String> colNames) {
     // top level struct
     Type type = footer.getTypesList().get(0);
+    if (type.getSubtypesCount() == 0) {
+      return Collections.emptyList();
+    }
     List<Integer> colIndices = Lists.newArrayList();
     List<String> fieldNames = type.getFieldNamesList();
     int fieldIdx = 0;
