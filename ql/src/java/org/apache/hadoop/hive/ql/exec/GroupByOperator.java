@@ -1144,4 +1144,9 @@ public class GroupByOperator extends Operator<GroupByDesc> {
     return getConf().getMode() == GroupByDesc.Mode.MERGEPARTIAL ||
         getConf().getMode() == GroupByDesc.Mode.COMPLETE;
   }
+
+  @Override
+  protected float overhead() {
+    return 0.2f;
+  }
 }

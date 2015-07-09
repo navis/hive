@@ -377,9 +377,12 @@ public class GenTezWork implements NodeProcessor {
           // add dependency between the two work items
           TezEdgeProperty edgeProp;
           if (rWork.isAutoReduceParallelism()) {
+            float overhead = Operator.overhead(rWork.getReducer());
+            LOG.warn("Calculated overhead (GenTezWork) : " + overhead);
             edgeProp =
                 new TezEdgeProperty(context.conf, EdgeType.SIMPLE_EDGE, true,
-                    rWork.getMinReduceTasks(), rWork.getMaxReduceTasks(), bytesPerReducer);
+                    rWork.getMinReduceTasks(), rWork.getMaxReduceTasks(),
+                    (long)(bytesPerReducer / overhead));
           } else {
             edgeProp = new TezEdgeProperty(EdgeType.SIMPLE_EDGE);
           }

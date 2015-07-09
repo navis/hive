@@ -836,7 +836,8 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
     public List<OrcSplit> call() throws IOException {
       populateAndCacheStripeDetails();
       long threshold = context.maxSize >> 2;
-      if (fileMetaInfo.compressionType != null && !fileMetaInfo.compressionType.isEmpty()) {
+      ReaderImpl.FileMetaInfo metaInfo = fileMetaInfo != null ? fileMetaInfo : fileInfo.fileMetaInfo;
+      if (metaInfo != null && metaInfo.compressionType != null && !metaInfo.compressionType.isEmpty()) {
         threshold >>= 2;
       }
       LOG.warn("Start SplitGenerator.call :: try " + file + " split with threshold " + threshold);
@@ -934,17 +935,17 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
       projColsUncompressedSize = orcReader.getRawDataSizeOfColumns(projCols);
       if (fileInfo != null) {
         stripes = fileInfo.stripeInfos;
+        fileMetaInfo = fileInfo.fileMetaInfo;
+        metadata = fileInfo.metadata;
+        types = fileInfo.types;
+        writerVersion = fileInfo.writerVersion;
         // For multiple runs, in case sendSplitsInFooter changes
-        if (fileInfo.fileMetaInfo == null && context.footerInSplits) {
+        if (fileMetaInfo == null && context.footerInSplits) {
           fileInfo.fileMetaInfo = ((ReaderImpl) orcReader).getFileMetaInfo();
           fileInfo.metadata = orcReader.getMetadata();
           fileInfo.types = orcReader.getTypes();
           fileInfo.writerVersion = orcReader.getWriterVersion();
         }
-        fileMetaInfo = fileInfo.fileMetaInfo;
-        metadata = fileInfo.metadata;
-        types = fileInfo.types;
-        writerVersion = fileInfo.writerVersion;
       } else {
         stripes = orcReader.getStripes();
         metadata = orcReader.getMetadata();

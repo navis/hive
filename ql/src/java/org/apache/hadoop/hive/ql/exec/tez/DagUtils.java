@@ -76,6 +76,8 @@ import org.apache.hadoop.hive.ql.plan.TezWork.VertexType;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.ql.stats.StatsFactory;
 import org.apache.hadoop.hive.ql.stats.StatsPublisher;
+import org.apache.hadoop.hive.shims.HadoopShims;
+import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.hive.shims.Utils;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataOutputBuffer;
@@ -519,6 +521,16 @@ public class DagUtils {
     }
   }
 
+  static final HadoopShims SHIMS = ShimLoader.getHadoopShims();
+  static final String MIN_SPLIT_SIZE =
+          SHIMS.getHadoopConfNames().get("MAPREDMINSPLITSIZE");
+  static final String MAX_SPLIT_SIZE =
+          SHIMS.getHadoopConfNames().get("MAPREDMAXSPLITSIZE");
+
+  private static final long DEFAULT_MIN_SPLIT_SIZE = 16 * 1024 * 1024;
+  private static final long DEFAULT_MAX_SPLIT_SIZE = 256 * 1024 * 1024;
+
+
   /*
    * Helper function to create Vertex from MapWork.
    */
@@ -612,9 +624,21 @@ public class DagUtils {
       }
     } else {
       // Setup client side split generation.
-      dataSource = MRInputHelpers.configureMRInputWithLegacySplitGeneration(conf, new Path(tezDir,
-          "split_" + mapWork.getName().replaceAll(" ", "_")), true);
+      long maxSize = conf.getLong(MAX_SPLIT_SIZE, DEFAULT_MAX_SPLIT_SIZE);
+      float overhead = Operator.overhead(mapWork.getAllRootOperators());
+      if (overhead > 1) {
+        LOG.warn("Calculated overhead (DagUtil) for " + mapWork.getName() + " : " + overhead +
+                ", max split : " + (long) (maxSize / overhead));
+        conf.setLong(MAX_SPLIT_SIZE, (long) (maxSize / overhead));
+      }
+      try {
+        dataSource = MRInputHelpers.configureMRInputWithLegacySplitGeneration(conf, new Path(tezDir,
+                "split_" + mapWork.getName().replaceAll(" ", "_")), true);
+      } finally {
+        conf.setLong(MAX_SPLIT_SIZE, maxSize);
+      }
       numTasks = dataSource.getNumberOfShards();
+      LOG.warn("Final number of tasks (DagUtil) for " + mapWork.getName() + " : " + numTasks);
 
       // set up the operator plan. (after generating splits - that changes configs)
       Utilities.setMapWork(conf, mapWork, mrScratchDir, false);

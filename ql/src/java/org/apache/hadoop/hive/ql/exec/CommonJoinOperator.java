@@ -819,4 +819,18 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
   public boolean opAllowedAfterMapJoin() {
     return false;
   }
+
+  @Override
+  protected float overhead() {
+    float overhead = 0;
+    for (JoinCondDesc cond : conf.getConds()) {
+      switch (cond.getType()) {
+        case JoinDesc.LEFT_SEMI_JOIN: overhead += 0.05f;
+        case JoinDesc.UNIQUE_JOIN: case JoinDesc.INNER_JOIN: overhead += 0.1f;
+        case JoinDesc.LEFT_OUTER_JOIN: case JoinDesc.RIGHT_OUTER_JOIN: overhead += 0.2f;
+        case JoinDesc.FULL_OUTER_JOIN: overhead += 0.4f;
+      }
+    }
+    return overhead;
+  }
 }

@@ -145,9 +145,12 @@ public class GenTezUtils {
 
     TezEdgeProperty edgeProp;
     if (reduceWork.isAutoReduceParallelism()) {
+      float overhead = Operator.overhead(reduceWork.getReducer());
+      LOG.warn("Calculated overhead (GenTezUtils) : " + overhead);
       edgeProp =
           new TezEdgeProperty(context.conf, EdgeType.SIMPLE_EDGE, true,
-              reduceWork.getMinReduceTasks(), reduceWork.getMaxReduceTasks(), bytesPerReducer);
+              reduceWork.getMinReduceTasks(), reduceWork.getMaxReduceTasks(),
+              (long)(bytesPerReducer / overhead));
     } else {
       edgeProp = new TezEdgeProperty(EdgeType.SIMPLE_EDGE);
     }

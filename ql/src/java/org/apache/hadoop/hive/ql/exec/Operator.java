@@ -22,6 +22,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -1353,5 +1354,38 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
     protected Collection<Future<?>> initializeOp(Configuration conf) {
       return childOperators;
     }
+  }
+
+  public static float overhead(Operator<?> operator) {
+    return overhead(Collections.<Operator<?>>singleton(operator));
+  }
+
+  public static float overhead(Collection<Operator<?>> operators) {
+    float overhead = 1.0f;
+    Set<Operator> visited = new HashSet<>();
+    for (Operator<?> operator : operators) {
+      visited.add(operator);
+      overhead += operator.calculateOverhead(visited);
+    }
+    return overhead;
+  }
+
+  protected float overhead() {
+    return 0.0f;
+  }
+
+  private float calculateOverhead(Set<Operator> visited) {
+    float overhead = overhead();
+    int numChild = getNumChild();
+    if (numChild == 0) {
+      return overhead;
+    }
+    for (int i = 0; i < numChild; i++) {
+      Operator<?> child = childOperators.get(i);
+      if (visited.add(child)) {
+        overhead += child.calculateOverhead(visited);
+      }
+    }
+    return overhead;
   }
 }
