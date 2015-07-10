@@ -50,7 +50,11 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.ErrorMsg;
+import org.apache.hadoop.hive.ql.exec.CommonJoinOperator;
+import org.apache.hadoop.hive.ql.exec.GroupByOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.OperatorUtils;
+import org.apache.hadoop.hive.ql.exec.PTFOperator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.mr.ExecMapper;
 import org.apache.hadoop.hive.ql.exec.mr.ExecReducer;
@@ -111,7 +115,6 @@ import org.apache.tez.dag.api.TezException;
 import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.dag.api.Vertex;
 import org.apache.tez.dag.api.VertexGroup;
-import org.apache.tez.dag.api.VertexLocationHint;
 import org.apache.tez.dag.api.VertexManagerPluginDescriptor;
 import org.apache.tez.dag.library.vertexmanager.ShuffleVertexManager;
 import org.apache.tez.mapreduce.hadoop.MRHelpers;
@@ -424,13 +427,22 @@ public class DagUtils {
    * from yarn. Falls back to Map-reduce's map size if tez
    * container size isn't set.
    */
-  public static Resource getContainerResource(Configuration conf) {
+  public static Resource getContainerResource(Configuration conf, boolean simpleOperation) {
     int memory = HiveConf.getIntVar(conf, HiveConf.ConfVars.HIVETEZCONTAINERSIZE) > 0 ?
       HiveConf.getIntVar(conf, HiveConf.ConfVars.HIVETEZCONTAINERSIZE) :
       conf.getInt(MRJobConfig.MAP_MEMORY_MB, MRJobConfig.DEFAULT_MAP_MEMORY_MB);
     int cpus = HiveConf.getIntVar(conf, HiveConf.ConfVars.HIVETEZCPUVCORES) > 0 ?
       HiveConf.getIntVar(conf, HiveConf.ConfVars.HIVETEZCPUVCORES) :
       conf.getInt(MRJobConfig.MAP_CPU_VCORES, MRJobConfig.DEFAULT_MAP_CPU_VCORES);
+    if (simpleOperation) {
+      memory = conf.getInt("hive.tez.container.size.min", 256);
+    }
+    int sortmb = conf.getInt(
+        TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB,
+        TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB_DEFAULT);
+    sortmb = Math.min(sortmb, (int)(memory * 0.2f));
+    conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB, sortmb);
+
     return Resource.newInstance(memory, cpus);
   }
 
@@ -448,7 +460,7 @@ public class DagUtils {
    * Falls back to Map-reduces map java opts if no tez specific options
    * are set
    */
-  private String getContainerJavaOpts(Configuration conf) {
+  private String getContainerJavaOpts(Configuration conf, Resource resource) {
     String javaOpts = HiveConf.getVar(conf, HiveConf.ConfVars.HIVETEZJAVAOPTS);
 
     String logLevel = HiveConf.getVar(conf, HiveConf.ConfVars.HIVETEZLOGLEVEL);
@@ -462,6 +474,8 @@ public class DagUtils {
 
     if (HiveConf.getIntVar(conf, HiveConf.ConfVars.HIVETEZCONTAINERSIZE) > 0) {
       if (javaOpts != null) {
+        javaOpts = javaOpts.replaceAll("-Xmx\\d+\\S*", "-Xmx" + resource.getMemory() + "m");
+        javaOpts = javaOpts.replaceAll("-Xms\\d+\\S*", "-Xms" + resource.getMemory() + "m");
         return javaOpts + " " + logLevel;
       } else  {
         return logLevel;
@@ -644,17 +658,22 @@ public class DagUtils {
       Utilities.setMapWork(conf, mapWork, mrScratchDir, false);
     }
 
-    UserPayload serializedConf = TezUtils.createUserPayloadFromConf(conf);
     String procClassName = MapTezProcessor.class.getName();
     if (mapWork instanceof MergeFileWork) {
       procClassName = MergeFileTezProcessor.class.getName();
     }
 
+    boolean simpleOperation =
+        OperatorUtils.findOperators(mapWork.getAllRootOperators(), GroupByOperator.class).isEmpty() &&
+        OperatorUtils.findOperators(mapWork.getAllRootOperators(), CommonJoinOperator.class).isEmpty() &&
+        OperatorUtils.findOperators(mapWork.getAllRootOperators(), PTFOperator.class).isEmpty();
+
+    Resource containerResource = getContainerResource(conf, simpleOperation);
     map = Vertex.create(mapWork.getName(), ProcessorDescriptor.create(procClassName)
-        .setUserPayload(serializedConf), numTasks, getContainerResource(conf));
+        .setUserPayload(TezUtils.createUserPayloadFromConf(conf)), numTasks, containerResource);
 
     map.setTaskEnvironment(getContainerEnvironment(conf, true));
-    map.setTaskLaunchCmdOpts(getContainerJavaOpts(conf));
+    map.setTaskLaunchCmdOpts(getContainerJavaOpts(conf, map.getTaskResource()));
 
     assert mapWork.getAliasToWork().keySet().size() == 1;
 
@@ -705,15 +724,21 @@ public class DagUtils {
     // create the directories FileSinkOperators need
     Utilities.createTmpDirs(conf, reduceWork);
 
+    boolean simpleOperation =
+        OperatorUtils.findOperators(reduceWork.getReducer(), GroupByOperator.class).isEmpty() &&
+        OperatorUtils.findOperators(reduceWork.getReducer(), CommonJoinOperator.class).isEmpty() &&
+        OperatorUtils.findOperators(reduceWork.getReducer(), PTFOperator.class).isEmpty();
+
     // create the vertex
+    Resource containerResource = getContainerResource(conf, simpleOperation);
     Vertex reducer = Vertex.create(reduceWork.getName(),
         ProcessorDescriptor.create(ReduceTezProcessor.class.getName()).
         setUserPayload(TezUtils.createUserPayloadFromConf(conf)),
             reduceWork.isAutoReduceParallelism() ? reduceWork.getMaxReduceTasks() : reduceWork
-                .getNumReduceTasks(), getContainerResource(conf));
+                .getNumReduceTasks(), containerResource);
 
     reducer.setTaskEnvironment(getContainerEnvironment(conf, false));
-    reducer.setTaskLaunchCmdOpts(getContainerJavaOpts(conf));
+    reducer.setTaskLaunchCmdOpts(getContainerJavaOpts(conf, reducer.getTaskResource()));
 
     Map<String, LocalResource> localResources = new HashMap<String, LocalResource>();
     localResources.put(getBaseName(appJarLr), appJarLr);
@@ -762,10 +787,12 @@ public class DagUtils {
       int numContainers, Map<String, LocalResource> localResources) throws
       IOException, TezException {
 
+    Resource containerResource = getContainerResource(conf, false);
     ProcessorDescriptor prewarmProcDescriptor = ProcessorDescriptor.create(HivePreWarmProcessor.class.getName());
     prewarmProcDescriptor.setUserPayload(TezUtils.createUserPayloadFromConf(conf));
 
-    PreWarmVertex prewarmVertex = PreWarmVertex.create("prewarm", prewarmProcDescriptor, numContainers,getContainerResource(conf));
+    PreWarmVertex prewarmVertex = PreWarmVertex.create("prewarm",
+        prewarmProcDescriptor, numContainers, containerResource);
 
     Map<String, LocalResource> combinedResources = new HashMap<String, LocalResource>();
 
@@ -774,7 +801,7 @@ public class DagUtils {
     }
 
     prewarmVertex.addTaskLocalFiles(localResources);
-    prewarmVertex.setTaskLaunchCmdOpts(getContainerJavaOpts(conf));
+    prewarmVertex.setTaskLaunchCmdOpts(getContainerJavaOpts(conf, prewarmVertex.getTaskResource()));
     prewarmVertex.setTaskEnvironment(getContainerEnvironment(conf, false));
     return prewarmVertex;
   }
@@ -1216,5 +1243,9 @@ public class DagUtils {
 
   private DagUtils() {
     // don't instantiate
+  }
+
+  public static void main(String[] args) {
+    System.out.println("-Xmx2567778 -Xms23m".replaceAll("-Xmx\\d+\\S*", "-Xmx" + 100000000));
   }
 }

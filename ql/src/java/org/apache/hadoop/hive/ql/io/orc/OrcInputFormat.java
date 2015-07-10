@@ -759,6 +759,10 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
       }
     }
 
+    OrcSplit createSplit(long offset, long length,
+                         ReaderImpl.FileMetaInfo fileMetaInfo) throws IOException {
+      return createSplit(offset, length, fileMetaInfo, 1);
+    }
     /**
      * Create an input split over the given range of bytes. The location of the
      * split is based on where the majority of the byte are coming from. ORC
