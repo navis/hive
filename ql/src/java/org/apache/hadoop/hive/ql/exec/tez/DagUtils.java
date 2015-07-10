@@ -649,9 +649,7 @@ public class DagUtils {
     if (mapWork instanceof MergeFileWork) {
       procClassName = MergeFileTezProcessor.class.getName();
     }
-    VertexLocationHint locationHint = dataSource.getLocationHint();
-    LOG.warn("DAG : " + mapWork.getName() + " --> " + numTasks +
-            (locationHint != null && locationHint.getTaskLocationHints() != null ? locationHint.getTaskLocationHints().size() : ""));
+
     map = Vertex.create(mapWork.getName(), ProcessorDescriptor.create(procClassName)
         .setUserPayload(serializedConf), numTasks, getContainerResource(conf));
 
