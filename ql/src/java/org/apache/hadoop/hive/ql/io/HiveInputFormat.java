@@ -23,12 +23,15 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map.Entry;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configurable;
@@ -36,7 +39,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.io.HiveIOExceptionHandlerUtil;
-import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
@@ -44,11 +46,11 @@ import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.log.PerfLogger;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.MapWork;
-import org.apache.hadoop.hive.ql.plan.MergeJoinWork;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.PartitionDesc;
 import org.apache.hadoop.hive.ql.plan.TableScanDesc;
 import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
+import org.apache.hadoop.hive.shims.HadoopShims;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
@@ -77,7 +79,7 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
   /**
    * A cache of InputFormat instances.
    */
-  private static Map<Class, InputFormat<WritableComparable, Writable>> inputFormats 
+  private static Map<Class, InputFormat<WritableComparable, Writable>> inputFormats
     = new ConcurrentHashMap<Class, InputFormat<WritableComparable, Writable>>();
 
   private JobConf job;
@@ -85,6 +87,24 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
   // both classes access by subclasses
   protected Map<String, PartitionDesc> pathToPartitionInfo;
   protected MapWork mrwork;
+
+  public static final String OP_BASE_LOAD = "hive.optree.base.load";
+
+  @Override
+  public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException {
+    init(job);
+    job.unset(OP_BASE_LOAD);
+    if (job.getBoolean("navis.calculate.overhead", false)) {
+      float overhead = Operator.overhead(mrwork.getAllRootOperators());
+      if (overhead > 1) {
+        LOG.warn("Calculated overhead (in HiveInputFormat) for " + mrwork.getName() + " = " + overhead);
+        job.setFloat(OP_BASE_LOAD, overhead);
+      }
+    }
+    InputSplit[] splits = _getSplits(job, numSplits);
+    LOG.warn("Resulting number of splits (in HiveInputFormat) for " + mrwork.getName() + " = " + splits.length);
+    return splits;
+  }
 
   /**
    * HiveInputSplit encapsulates an InputSplit with its corresponding
@@ -97,6 +117,8 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     InputSplit inputSplit;
     String inputFormatClassName;
 
+    transient boolean compbineable = true;
+
     public HiveInputSplit() {
       // This is the only public constructor of FileSplit
       super((Path) null, 0, 0, (String[]) null);
@@ -107,6 +129,10 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
       super((Path) null, 0, 0, (String[]) null);
       this.inputSplit = inputSplit;
       this.inputFormatClassName = inputFormatClassName;
+    }
+
+    public boolean isCompbineable() {
+      return compbineable;
     }
 
     public InputSplit getInputSplit() {
@@ -271,6 +297,15 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     }
   }
 
+  static final HadoopShims SHIMS = ShimLoader.getHadoopShims();
+  static final String MIN_SPLIT_SIZE =
+          SHIMS.getHadoopConfNames().get("MAPREDMINSPLITSIZE");
+  static final String MAX_SPLIT_SIZE =
+          SHIMS.getHadoopConfNames().get("MAPREDMAXSPLITSIZE");
+
+  private static final long DEFAULT_MIN_SPLIT_SIZE = 16 * 1024 * 1024;
+  private static final long DEFAULT_MAX_SPLIT_SIZE = 256 * 1024 * 1024;
+
   /*
    * AddSplitsForGroup collects separate calls to setInputPaths into one where possible.
    * The reason for this is that this is faster on some InputFormats. E.g.: Orc will start
@@ -303,9 +338,35 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
       }
     }
 
-    InputSplit[] iss = inputFormat.getSplits(conf, splits);
-    for (InputSplit is : iss) {
-      result.add(new HiveInputSplit(is, inputFormatClass.getName()));
+    float baseLoad = conf.getFloat(HiveInputFormat.OP_BASE_LOAD, 1.0f);
+    long minSplit = conf.getLong(MIN_SPLIT_SIZE, DEFAULT_MIN_SPLIT_SIZE);
+    long maxSplit = conf.getLong(MAX_SPLIT_SIZE, DEFAULT_MAX_SPLIT_SIZE);
+    if (baseLoad > 1) {
+      conf.setLong(MIN_SPLIT_SIZE, (long)(minSplit / baseLoad));
+      conf.setLong(MAX_SPLIT_SIZE, (long)(maxSplit / baseLoad));
+      LOG.warn("Expected split size is modified as MIN : " + (long)(minSplit / baseLoad) +
+              ", MAX :" + (long) (maxSplit / baseLoad) + " by baseLoad " + baseLoad);
+    }
+    try {
+      InputSplit[] iss = inputFormat.getSplits(conf, splits);
+      Multimap<Path, InputSplit> rewrite = ArrayListMultimap.<Path, InputSplit>create();
+      for (InputSplit is : iss) {
+        if (is instanceof FileSplit) {
+          rewrite.put(((FileSplit)is).getPath(), is);
+        }
+      }
+      Map<Path, Collection<InputSplit>> map = rewrite.asMap();
+      for (InputSplit is : iss) {
+        HiveInputSplit hsplit = new HiveInputSplit(is, inputFormatClass.getName());
+        if (is instanceof FileSplit) {
+          Collection<InputSplit> split = map.get(((FileSplit) is).getPath());
+          hsplit.compbineable = split == null || split.size() < 2;
+        }
+        result.add(hsplit);
+      }
+    } finally {
+      conf.setLong(MIN_SPLIT_SIZE, minSplit);
+      conf.setLong(MAX_SPLIT_SIZE, maxSplit);
     }
   }
 
@@ -327,7 +388,7 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     return dirs;
   }
 
-  public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException {
+  private InputSplit[] _getSplits(JobConf job, int numSplits) throws IOException {
     PerfLogger perfLogger = PerfLogger.getPerfLogger();
     perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.GET_SPLITS);
     init(job);

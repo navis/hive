@@ -8484,14 +8484,14 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   // D can be merged with A-B into single join If and only if C and D has same join type
   // In this case, A-B-D join will be executed first and ABD-C join will be executed in next
   private void mergeJoinTree(QB qb) {
-    if (conf.getBoolean("hive.disable.jointree.merge", false)) {
+    if (conf.getBoolean("navis.disable.jointree.merge", false)) {
       return;
     }
     QBJoinTree tree = qb.getQbJoinTree();
     if (tree.getJoinSrc() == null) {
       return;
     }
-    boolean disableOuterJoinMerge = conf.getBoolean("hive.disable.jointree.merge.outer", false);
+    boolean disableOuterJoinMerge = conf.getBoolean("navis.disable.jointree.merge.outer", false);
     // make array with QBJoinTree : outer most(0) --> inner most(n)
     List<QBJoinTree> trees = new ArrayList<QBJoinTree>();
     for (;tree != null; tree = tree.getJoinSrc()) {

@@ -52,6 +52,8 @@ import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
 import org.apache.hadoop.hive.ql.io.HivePartitioner;
 import org.apache.hadoop.hive.ql.io.RecordUpdater;
 import org.apache.hadoop.hive.ql.io.StatsProvidingRecordWriter;
+import org.apache.hadoop.hive.ql.io.orc.OrcNewOutputFormat;
+import org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.HiveFatalException;
 import org.apache.hadoop.hive.ql.plan.DynamicPartitionCtx;
@@ -81,6 +83,7 @@ import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.OutputFormat;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /**
@@ -1280,5 +1283,15 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
       }
     }
     return new String[] {fspKey, null};
+  }
+
+  @Override
+  protected float overhead(float current) {
+    float overhead = 0.1f;
+    Class<?> output = conf.getTableInfo().getOutputFileFormatClass();
+    if (output == OrcOutputFormat.class || output == OrcNewOutputFormat.class) {
+      overhead += 0.4f;
+    }
+    return overhead;
   }
 }

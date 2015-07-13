@@ -19,6 +19,7 @@
 package org.apache.hadoop.hive.ql.exec.tez;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -74,47 +75,48 @@ public class SplitGrouper {
       Multimap<Integer, InputSplit> bucketSplitMultimap, int availableSlots, float waves)
       throws IOException {
 
-    Map<Integer, Collection<InputSplit>> rewrite = new HashMap<>();
     Map<Integer, Collection<InputSplit>> splitMap = bucketSplitMultimap.asMap();
+
+    int bucket = 0;
+    Multimap<Integer, InputSplit> rewrite = ArrayListMultimap.<Integer, InputSplit>create();
     for (Map.Entry<Integer, Collection<InputSplit>> entry : splitMap.entrySet()) {
-      HiveInputFormat.HiveInputSplit hsplit =
-              (HiveInputFormat.HiveInputSplit)entry.getValue().iterator().next();
-      if (!(hsplit.getInputSplit() instanceof OrcSplit)) {
-        rewrite.put(entry.getKey(), entry.getValue());
-        continue;
-      }
-      Multimap<Integer, InputSplit> map = ArrayListMultimap.<Integer, InputSplit>create();
+      List<HiveInputFormat.HiveInputSplit> remaining = new ArrayList<HiveInputFormat.HiveInputSplit>();
       for (InputSplit split : entry.getValue()) {
-        hsplit = (HiveInputFormat.HiveInputSplit) split;
-        OrcSplit orcSplit = (OrcSplit)hsplit.getInputSplit();
-        if (orcSplit.getLoadMultiplier() <= 1) {
-          map.put(1, hsplit);
+        HiveInputFormat.HiveInputSplit hsplit = (HiveInputFormat.HiveInputSplit) split;
+        if (hsplit.isCompbineable() && !(hsplit.getInputSplit() instanceof OrcSplit)) {
+          rewrite.put(bucket, hsplit);
         } else {
-          map.put(orcSplit.getLoadMultiplier(), hsplit);
+          remaining.add(hsplit);
         }
       }
-      for (Collection<InputSplit> splits : map.asMap().values()) {
-        rewrite.put(entry.getKey(), splits);
+      bucket++;
+      for (HiveInputFormat.HiveInputSplit hsplit : remaining) {
+        OrcSplit orcSplit = (OrcSplit)hsplit.getInputSplit();
+        rewrite.put(orcSplit.isCombineable() ? bucket : bucket++, hsplit);
       }
     }
+    LOG.warn("Regrouped " + splitMap.size() + " buckets into " + rewrite.keySet().size() + " buckets");
+
+    splitMap = rewrite.asMap();
+
     // figure out how many tasks we want for each bucket
-    Map<Integer, Integer> bucketTaskMap = estimateBucketSizes(availableSlots, waves, rewrite);
+    Map<Integer, Integer> bucketTaskMap = estimateBucketSizes(availableSlots, waves, rewrite.asMap());
 
     // allocate map bucket id to grouped splits
     Multimap<Integer, InputSplit> bucketGroupedSplitMultimap =
         ArrayListMultimap.<Integer, InputSplit> create();
 
     // use the tez grouper to combine splits once per bucket
-    for (int bucketId : bucketSplitMultimap.keySet()) {
-      Collection<InputSplit> inputSplitCollection = bucketSplitMultimap.get(bucketId);
+    for (int bucketId : splitMap.keySet()) {
+      Collection<InputSplit> inputSplitCollection = splitMap.get(bucketId);
 
       InputSplit[] rawSplits = inputSplitCollection.toArray(new InputSplit[0]);
       InputSplit[] groupedSplits =
           tezGrouper.getGroupedSplits(conf, rawSplits, bucketTaskMap.get(bucketId),
               HiveInputFormat.class.getName());
 
-      LOG.info("Original split size is " + rawSplits.length + " grouped split size is "
-          + groupedSplits.length + ", for bucket: " + bucketId);
+      LOG.warn("Original split size is " + rawSplits.length + " grouped split size is "
+              + groupedSplits.length + ", for bucket: " + bucketId);
 
       for (InputSplit inSplit : groupedSplits) {
         bucketGroupedSplitMultimap.put(bucketId, inSplit);
@@ -236,22 +238,17 @@ public class SplitGrouper {
 
     // compute the number of tasks
     for (int bucketId : bucketSizeMap.keySet()) {
-      int loadMultiplier = 1;
-      InputSplit split = bucketSplitMap.get(bucketId).iterator().next();
-      if (split instanceof OrcSplit) {
-        OrcSplit orcSplit = (OrcSplit)split;
-        loadMultiplier = orcSplit.getLoadMultiplier() <= 1 ? 1 : orcSplit.getLoadMultiplier();
-      }
       int numEstimatedTasks = 0;
       if (totalSize != 0) {
         // availableSlots * waves => desired slots to fill
         // sizePerBucket/totalSize => weight for particular bucket. weights add
         // up to 1.
         numEstimatedTasks =
-            (int) (availableSlots * waves * loadMultiplier * bucketSizeMap.get(bucketId) / totalSize);
+            (int) (availableSlots * waves * bucketSizeMap.get(bucketId) / totalSize);
       }
 
-      LOG.info("Estimated number of tasks: " + numEstimatedTasks + " for bucket " + bucketId);
+      LOG.warn("Estimated number of tasks: " + numEstimatedTasks + " for bucket " + bucketId + ". " +
+              "with availableSlots=" + availableSlots + ", waves=" + waves);
       if (numEstimatedTasks == 0) {
         numEstimatedTasks = 1;
       }

@@ -821,16 +821,16 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
   }
 
   @Override
-  protected float overhead() {
+  protected float overhead(float current) {
     float overhead = 0;
     for (JoinCondDesc cond : conf.getConds()) {
       switch (cond.getType()) {
-        case JoinDesc.LEFT_SEMI_JOIN: overhead += 0.05f;
-        case JoinDesc.UNIQUE_JOIN: case JoinDesc.INNER_JOIN: overhead += 0.1f;
-        case JoinDesc.LEFT_OUTER_JOIN: case JoinDesc.RIGHT_OUTER_JOIN: overhead += 0.2f;
-        case JoinDesc.FULL_OUTER_JOIN: overhead += 0.4f;
+        case JoinDesc.LEFT_SEMI_JOIN: overhead += 0.04f;
+        case JoinDesc.UNIQUE_JOIN: case JoinDesc.INNER_JOIN: overhead += 0.05f;
+        case JoinDesc.LEFT_OUTER_JOIN: case JoinDesc.RIGHT_OUTER_JOIN: overhead += 0.07f;
+        case JoinDesc.FULL_OUTER_JOIN: overhead += 0.1f;
       }
     }
-    return overhead;
+    return current * overhead;
   }
 }

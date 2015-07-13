@@ -1146,7 +1146,7 @@ public class GroupByOperator extends Operator<GroupByDesc> {
   }
 
   @Override
-  protected float overhead() {
-    return 0.2f;
+  protected float overhead(float current) {
+    return current * 0.1f;
   }
 }

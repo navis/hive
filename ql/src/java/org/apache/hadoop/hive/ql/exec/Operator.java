@@ -1365,25 +1365,22 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
     Set<Operator> visited = new HashSet<>();
     for (Operator<?> operator : operators) {
       visited.add(operator);
-      overhead += operator.calculateOverhead(visited);
+      overhead += operator.calculateOverhead(visited, 1.0f);
     }
     return overhead;
   }
 
-  protected float overhead() {
+  protected float overhead(float current) {
     return 0.0f;
   }
 
-  private float calculateOverhead(Set<Operator> visited) {
-    float overhead = overhead();
-    int numChild = getNumChild();
-    if (numChild == 0) {
-      return overhead;
-    }
-    for (int i = 0; i < numChild; i++) {
+  private float calculateOverhead(Set<Operator> visited, float current) {
+    float overhead = overhead(current);
+    float input = current + overhead;
+    for (int i = 0; i < getNumChild(); i++) {
       Operator<?> child = childOperators.get(i);
       if (!(child instanceof ReduceSinkOperator) && visited.add(child)) {
-        overhead += child.calculateOverhead(visited);
+        overhead += child.calculateOverhead(visited, input);
       }
     }
     return overhead;

@@ -434,15 +434,9 @@ public class DagUtils {
     int cpus = HiveConf.getIntVar(conf, HiveConf.ConfVars.HIVETEZCPUVCORES) > 0 ?
       HiveConf.getIntVar(conf, HiveConf.ConfVars.HIVETEZCPUVCORES) :
       conf.getInt(MRJobConfig.MAP_CPU_VCORES, MRJobConfig.DEFAULT_MAP_CPU_VCORES);
-    if (simpleOperation) {
-      memory = conf.getInt("hive.tez.container.size.min", 256);
-    }
-    int sortmb = conf.getInt(
-        TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB,
-        TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB_DEFAULT);
-    sortmb = Math.min(sortmb, (int)(memory * 0.2f));
-    conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB, sortmb);
-
+//    if (simpleOperation) {
+//      memory = conf.getInt("hive.tez.container.size.min", 256);
+//    }
     return Resource.newInstance(memory, cpus);
   }
 
@@ -474,8 +468,8 @@ public class DagUtils {
 
     if (HiveConf.getIntVar(conf, HiveConf.ConfVars.HIVETEZCONTAINERSIZE) > 0) {
       if (javaOpts != null) {
-        javaOpts = javaOpts.replaceAll("-Xmx\\d+\\S*", "-Xmx" + resource.getMemory() + "m");
-        javaOpts = javaOpts.replaceAll("-Xms\\d+\\S*", "-Xms" + resource.getMemory() + "m");
+//        javaOpts = javaOpts.replaceAll("-Xmx\\d+\\S*", "-Xmx" + resource.getMemory() + "m");
+//        javaOpts = javaOpts.replaceAll("-Xms\\d+\\S*", "-Xms" + resource.getMemory() + "m");
         return javaOpts + " " + logLevel;
       } else  {
         return logLevel;

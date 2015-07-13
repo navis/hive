@@ -44,7 +44,7 @@ public class OrcSplit extends FileSplit {
   private final List<Long> deltas = new ArrayList<Long>();
   private OrcFile.WriterVersion writerVersion;
   private long projColsUncompressedSize;
-  private int loadMultiplier;
+  private boolean combineable;
 
   static final int BASE_FLAG = 4;
   static final int ORIGINAL_FLAG = 2;
@@ -60,12 +60,12 @@ public class OrcSplit extends FileSplit {
   public OrcSplit(Path path, long offset, long length, String[] hosts,
       ReaderImpl.FileMetaInfo fileMetaInfo, boolean isOriginal, boolean hasBase,
       List<Long> deltas, long projectedDataSize) {
-    this(path, offset, length, hosts, fileMetaInfo, isOriginal, hasBase, deltas, projectedDataSize, -1);
+    this(path, offset, length, hosts, fileMetaInfo, isOriginal, hasBase, deltas, projectedDataSize, true);
   }
 
   public OrcSplit(Path path, long offset, long length, String[] hosts,
       ReaderImpl.FileMetaInfo fileMetaInfo, boolean isOriginal, boolean hasBase,
-      List<Long> deltas, long projectedDataSize, int loadMultiplier) {
+      List<Long> deltas, long projectedDataSize, boolean combineable) {
     super(path, offset, length, hosts);
     this.fileMetaInfo = fileMetaInfo;
     hasFooter = this.fileMetaInfo != null;
@@ -73,7 +73,7 @@ public class OrcSplit extends FileSplit {
     this.hasBase = hasBase;
     this.deltas.addAll(deltas);
     this.projColsUncompressedSize = projectedDataSize;
-    this.loadMultiplier = loadMultiplier;
+    this.combineable = combineable;
   }
 
   @Override
@@ -105,7 +105,7 @@ public class OrcSplit extends FileSplit {
               footerBuff.limit() - footerBuff.position());
       WritableUtils.writeVInt(out, fileMetaInfo.writerVersion.getId());
     }
-    out.writeInt(loadMultiplier);
+    out.writeBoolean(combineable);
   }
 
   @Override
@@ -139,7 +139,7 @@ public class OrcSplit extends FileSplit {
       fileMetaInfo = new ReaderImpl.FileMetaInfo(compressionType, bufferSize,
           metadataSize, footerBuff, writerVersion);
     }
-    loadMultiplier = in.readInt();
+    combineable = in.readBoolean();
   }
 
   ReaderImpl.FileMetaInfo getFileMetaInfo(){
@@ -166,5 +166,5 @@ public class OrcSplit extends FileSplit {
     return projColsUncompressedSize;
   }
 
-  public int getLoadMultiplier() { return loadMultiplier; }
+  public boolean isCombineable() { return combineable; }
 }
