@@ -31,8 +31,10 @@ import org.apache.hadoop.hive.serde2.SerDe;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.SerDeStats;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.BaseCharTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.hadoop.io.Writable;
 
@@ -100,6 +102,13 @@ public class OrcSerde implements SerDe, VectorizedSerde {
 
     ArrayList<TypeInfo> fieldTypes =
         TypeInfoUtils.getTypeInfosFromTypeString(columnTypeProperty);
+    if (conf.getBoolean("navis.orc.input.v13", false)) {
+      for (int i = 0; i < fieldTypes.size(); i++) {
+        if (fieldTypes.get(i) instanceof BaseCharTypeInfo) {
+          fieldTypes.set(i, TypeInfoFactory.stringTypeInfo);
+        }
+      }
+    }
     StructTypeInfo rootType = new StructTypeInfo();
     rootType.setAllStructFieldNames(columnNames);
     rootType.setAllStructFieldTypeInfos(fieldTypes);

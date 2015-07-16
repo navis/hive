@@ -2109,6 +2109,7 @@ class RecordReaderImpl implements RecordReader {
                                              boolean[] included,
                                              Configuration conf
                                             ) throws IOException {
+    final boolean comptible = conf.getBoolean("navis.orc.input.v13", false);
     OrcProto.Type type = types.get(columnId);
     switch (type.getKind()) {
       case BOOLEAN:
@@ -2128,11 +2129,17 @@ class RecordReaderImpl implements RecordReader {
       case STRING:
         return new StringTreeReader(path, columnId, conf);
       case CHAR:
+        if (comptible) {
+          return new StringTreeReader(path, columnId, conf);
+        }
         if (!type.hasMaximumLength()) {
           throw new IllegalArgumentException("ORC char type has no length specified");
         }
         return new CharTreeReader(path, columnId, type.getMaximumLength(), conf);
       case VARCHAR:
+        if (comptible) {
+          return new StringTreeReader(path, columnId, conf);
+        }
         if (!type.hasMaximumLength()) {
           throw new IllegalArgumentException("ORC varchar type has no length specified");
         }
