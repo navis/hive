@@ -75,25 +75,31 @@ public class SplitGrouper {
       Multimap<Integer, InputSplit> bucketSplitMultimap, int availableSlots, float waves)
       throws IOException {
 
+    long maxSplit = HiveInputFormat.maxSplitLoaded(conf);
     Map<Integer, Collection<InputSplit>> splitMap = bucketSplitMultimap.asMap();
 
     int bucket = 0;
     Multimap<Integer, InputSplit> rewrite = ArrayListMultimap.<Integer, InputSplit>create();
     for (Map.Entry<Integer, Collection<InputSplit>> entry : splitMap.entrySet()) {
-      List<HiveInputFormat.HiveInputSplit> remaining = new ArrayList<HiveInputFormat.HiveInputSplit>();
+      List<HiveInputFormat.HiveInputSplit> regroup = new ArrayList<HiveInputFormat.HiveInputSplit>();
       for (InputSplit split : entry.getValue()) {
         HiveInputFormat.HiveInputSplit hsplit = (HiveInputFormat.HiveInputSplit) split;
-        if (hsplit.isCompbineable() && !(hsplit.getInputSplit() instanceof OrcSplit)) {
-          rewrite.put(bucket, hsplit);
-        } else {
-          remaining.add(hsplit);
+        InputSplit inputSplit = hsplit.getInputSplit();
+        if (inputSplit instanceof OrcSplit && !((OrcSplit) inputSplit).isCombineable()) {
+          regroup.add(hsplit);
+          continue;
         }
+        if (inputSplit instanceof FileSplit && ((FileSplit) inputSplit).getLength() >= maxSplit) {
+          regroup.add(hsplit);
+          continue;
+        }
+        rewrite.put(bucket, hsplit);
       }
-      bucket++;
-      for (HiveInputFormat.HiveInputSplit hsplit : remaining) {
-        OrcSplit orcSplit = (OrcSplit)hsplit.getInputSplit();
-        rewrite.put(orcSplit.isCombineable() ? bucket : bucket++, hsplit);
+      int start = bucket;
+      for (HiveInputFormat.HiveInputSplit hsplit : regroup) {
+        rewrite.put(++bucket, hsplit);
       }
+      LOG.warn("-- Dedicated bucket for " + regroup.size() + " splits");
     }
     LOG.warn("Regrouped " + splitMap.size() + " buckets into " + rewrite.keySet().size() + " buckets");
 

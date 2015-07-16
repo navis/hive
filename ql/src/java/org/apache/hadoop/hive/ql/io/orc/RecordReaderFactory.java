@@ -62,9 +62,10 @@ public class RecordReaderFactory {
     } else {
       originalFileSchema = fileSchema;
     }
+    final boolean sparkCompatible = conf.getBoolean("navis.orc.input.v13", false);
     final int numCols = originalFileSchema.get(0).getSubtypesCount();
     List<OrcProto.Type> schemaOnRead = getSchemaOnRead(numCols, conf);
-    List<OrcProto.Type> schemaUsed = getMatchingSchema(fileSchema, schemaOnRead);
+    List<OrcProto.Type> schemaUsed = getMatchingSchema(fileSchema, schemaOnRead, sparkCompatible);
     if (schemaUsed == null) {
       return TreeReaderFactory.createTreeReader(colId, fileSchema, included, skipCorrupt);
     } else {
@@ -84,7 +85,7 @@ public class RecordReaderFactory {
   }
 
   private static List<OrcProto.Type> getMatchingSchema(List<OrcProto.Type> fileSchema,
-      List<OrcProto.Type> schemaOnRead) {
+      List<OrcProto.Type> schemaOnRead, boolean sparkCompatible) {
     if (schemaOnRead == null) {
       if (isLogInfoEnabled) {
         LOG.info("Schema is not specified on read. Using file schema.");
@@ -106,6 +107,15 @@ public class RecordReaderFactory {
       for (int i = 0; i < fileSchema.size(); i++) {
         OrcProto.Type fColType = fileSchema.get(i);
         OrcProto.Type rColType = schemaOnRead.get(i);
+        if (sparkCompatible && (
+                fColType.getKind().equals(OrcProto.Type.Kind.CHAR) ||
+                fColType.getKind().equals(OrcProto.Type.Kind.VARCHAR) ||
+                rColType.getKind().equals(OrcProto.Type.Kind.CHAR) ||
+                rColType.getKind().equals(OrcProto.Type.Kind.VARCHAR))) {
+          result.set(i, result.get(i).toBuilder().setKind(OrcProto.Type.Kind.STRING).build());
+          canPromoteType = true;
+          continue;
+        }
         if (!fColType.getKind().equals(rColType.getKind())) {
 
           if (fColType.getKind().equals(OrcProto.Type.Kind.SHORT)) {
@@ -115,8 +125,6 @@ public class RecordReaderFactory {
               // type promotion possible, converting SHORT to INT/LONG requested type
               result.set(i, result.get(i).toBuilder().setKind(rColType.getKind()).build());
               canPromoteType = true;
-            } else {
-              canPromoteType = false;
             }
 
           } else if (fColType.getKind().equals(OrcProto.Type.Kind.INT)) {
@@ -125,12 +133,8 @@ public class RecordReaderFactory {
               // type promotion possible, converting INT to LONG requested type
               result.set(i, result.get(i).toBuilder().setKind(rColType.getKind()).build());
               canPromoteType = true;
-            } else {
-              canPromoteType = false;
             }
 
-          } else {
-            canPromoteType = false;
           }
         }
       }

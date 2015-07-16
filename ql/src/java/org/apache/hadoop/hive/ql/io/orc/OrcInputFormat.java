@@ -43,15 +43,14 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidReadTxnList;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.hive.ql.exec.tez.DagUtils;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedInputFormatInterface;
 import org.apache.hadoop.hive.ql.io.AcidInputFormat;
 import org.apache.hadoop.hive.ql.io.AcidOutputFormat;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
-import org.apache.hadoop.hive.ql.io.HiveInputFormat;
 import org.apache.hadoop.hive.ql.io.InputFormatChecker;
 import org.apache.hadoop.hive.ql.io.RecordIdentifier;
 import org.apache.hadoop.hive.ql.io.StatsProvidingRecordReader;
@@ -386,22 +385,19 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
       this.conf = conf;
       minSize = conf.getLong(MIN_SPLIT_SIZE, DEFAULT_MIN_SPLIT_SIZE);
       maxSize = conf.getLong(MAX_SPLIT_SIZE, DEFAULT_MAX_SPLIT_SIZE);
-      String ss = conf.get(ConfVars.HIVE_ORC_SPLIT_STRATEGY.varname);
+      String ss = conf.get("hive.exec.orc.split.strategy");
       if (ss == null || ss.equals(SplitStrategyKind.HYBRID.name())) {
         splitStrategyKind = SplitStrategyKind.HYBRID;
       } else {
         LOG.info("Enforcing " + ss + " ORC split strategy");
         splitStrategyKind = SplitStrategyKind.valueOf(ss);
       }
-      footerInSplits = HiveConf.getBoolVar(conf,
-          ConfVars.HIVE_ORC_INCLUDE_FILE_FOOTER_IN_SPLITS);
+      footerInSplits = conf.getBoolean("hive.orc.splits.include.file.footer", false);
       numBuckets =
           Math.max(conf.getInt(hive_metastoreConstants.BUCKET_COUNT, 0), 0);
       LOG.debug("Number of buckets specified by conf file is " + numBuckets);
-      int cacheStripeDetailsSize = HiveConf.getIntVar(conf,
-          ConfVars.HIVE_ORC_CACHE_STRIPE_DETAILS_SIZE);
-      int numThreads = HiveConf.getIntVar(conf,
-          ConfVars.HIVE_ORC_COMPUTE_SPLITS_NUM_THREADS);
+      int cacheStripeDetailsSize = conf.getInt("hive.orc.cache.stripe.details.size", 10000);
+      int numThreads = conf.getInt("hive.orc.compute.splits.num.threads", 10);
 
       cacheStripeDetails = (cacheStripeDetailsSize > 0);
 
@@ -842,7 +838,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
     public List<OrcSplit> call() throws IOException {
       populateAndCacheStripeDetails();
 
-      float baseLoad = context.conf.getFloat(HiveInputFormat.OP_BASE_LOAD, 1.0f);
+      float baseLoad = context.conf.getFloat(DagUtils.OP_BASE_LOAD, 1.0f);
       float loadMultiplier = 1.0f;
       if (context.conf.getBoolean("navis.calculate.overhead", false)) {
         loadMultiplier = context.conf.getFloat("navis.calculate.overhead.orc", 3.0f);

@@ -29,6 +29,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -89,6 +91,7 @@ import org.apache.hadoop.mapred.FileOutputFormat;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputFormat;
+import org.apache.hadoop.mapreduce.split.TezMapReduceSplitsGrouper;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.LocalResourceType;
@@ -529,15 +532,34 @@ public class DagUtils {
     }
   }
 
-  static final HadoopShims SHIMS = ShimLoader.getHadoopShims();
-  static final String MIN_SPLIT_SIZE =
-          SHIMS.getHadoopConfNames().get("MAPREDMINSPLITSIZE");
-  static final String MAX_SPLIT_SIZE =
-          SHIMS.getHadoopConfNames().get("MAPREDMAXSPLITSIZE");
+  public static final String OP_BASE_LOAD = "hive.optree.base.load";
 
-  private static final long DEFAULT_MIN_SPLIT_SIZE = 16 * 1024 * 1024;
-  private static final long DEFAULT_MAX_SPLIT_SIZE = 256 * 1024 * 1024;
+  private void initConf(String name, Collection<Operator<?>> operators, Configuration conf) {
+    conf.unset(OP_BASE_LOAD);
+    if (conf.getBoolean("navis.calculate.overhead", false)) {
+      float baseLoad = Operator.overhead(operators);
+      LOG.warn("Calculated overhead for " + name + " = " + baseLoad);
+      if (baseLoad > 1) {
+        conf.setFloat(OP_BASE_LOAD, baseLoad);
+        long minLengthPerGroup = conf.getLong(
+                TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE,
+                TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE_DEFAULT);
+        long maxLengthPerGroup = conf.getLong(
+                TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE,
+                TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE_DEFAULT);
 
+        conf.setLong(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE,
+                (long)(minLengthPerGroup / baseLoad));
+        conf.setLong(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE,
+                (long)(maxLengthPerGroup / baseLoad));
+
+        LOG.warn("TEZ_GROUPING_SPLIT_MIN_SIZE for " + name + " = " +
+                conf.get(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE));
+        LOG.warn("TEZ_GROUPING_SPLIT_MIN_SIZE for " + name + " = " +
+                conf.get(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE));
+      }
+    }
+  }
 
   /*
    * Helper function to create Vertex from MapWork.
@@ -632,19 +654,8 @@ public class DagUtils {
       }
     } else {
       // Setup client side split generation.
-      long maxSize = conf.getLong(MAX_SPLIT_SIZE, DEFAULT_MAX_SPLIT_SIZE);
-      float overhead = Operator.overhead(mapWork.getAllRootOperators());
-      if (overhead > 1) {
-        LOG.warn("Calculated overhead (DagUtil) for " + mapWork.getName() + " : " + overhead +
-                ", max split : " + (long) (maxSize / overhead));
-        conf.setLong(MAX_SPLIT_SIZE, (long) (maxSize / overhead));
-      }
-      try {
-        dataSource = MRInputHelpers.configureMRInputWithLegacySplitGeneration(conf, new Path(tezDir,
-                "split_" + mapWork.getName().replaceAll(" ", "_")), true);
-      } finally {
-        conf.setLong(MAX_SPLIT_SIZE, maxSize);
-      }
+      dataSource = MRInputHelpers.configureMRInputWithLegacySplitGeneration(conf, new Path(tezDir,
+              "split_" + mapWork.getName().replaceAll(" ", "_")), true);
       numTasks = dataSource.getNumberOfShards();
       LOG.warn("Final number of tasks (DagUtil) for " + mapWork.getName() + " : " + numTasks);
 
@@ -661,6 +672,8 @@ public class DagUtils {
         OperatorUtils.findOperators(mapWork.getAllRootOperators(), GroupByOperator.class).isEmpty() &&
         OperatorUtils.findOperators(mapWork.getAllRootOperators(), CommonJoinOperator.class).isEmpty() &&
         OperatorUtils.findOperators(mapWork.getAllRootOperators(), PTFOperator.class).isEmpty();
+
+    initConf(mapWork.getName(), mapWork.getAllRootOperators(), conf);
 
     Resource containerResource = getContainerResource(conf, simpleOperation);
     map = Vertex.create(mapWork.getName(), ProcessorDescriptor.create(procClassName)
@@ -722,6 +735,9 @@ public class DagUtils {
         OperatorUtils.findOperators(reduceWork.getReducer(), GroupByOperator.class).isEmpty() &&
         OperatorUtils.findOperators(reduceWork.getReducer(), CommonJoinOperator.class).isEmpty() &&
         OperatorUtils.findOperators(reduceWork.getReducer(), PTFOperator.class).isEmpty();
+
+    // init tez conf
+    initConf(reduceWork.getName(), Collections.<Operator<?>>singleton(reduceWork.getReducer()), conf);
 
     // create the vertex
     Resource containerResource = getContainerResource(conf, simpleOperation);
