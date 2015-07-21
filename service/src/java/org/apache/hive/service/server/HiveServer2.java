@@ -24,8 +24,9 @@ import org.apache.hadoop.hive.common.LogUtils;
 import org.apache.hadoop.hive.common.LogUtils.LogInitializationException;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+import org.apache.hadoop.hive.ql.exec.Description;
+import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
 import org.apache.hadoop.hive.ql.exec.tez.TezSessionPoolManager;
-import org.apache.hadoop.hive.ql.exec.tez.TezSessionState;
 import org.apache.hive.common.util.HiveStringUtils;
 import org.apache.hive.service.CompositeService;
 import org.apache.hive.service.cli.CLIService;
@@ -64,8 +65,29 @@ public class HiveServer2 extends CompositeService {
       thriftCLIService = new ThriftBinaryCLIService(cliService);
     }
 
+    registerFunctions(hiveConf);
+
     addService(thriftCLIService);
     super.init(hiveConf);
+  }
+
+  private void registerFunctions(HiveConf hiveConf) {
+    String functions = hiveConf.get("navis.hiveserver2.init.functions", null);
+    if (functions != null) {
+      for (String function : functions.split(",")) {
+        Class<?> clazz = null;
+        try {
+          clazz = Class.forName(function.trim());
+        } catch (Exception e) {
+          LOG.warn("Failed to find class " + function, e);
+          continue;
+        }
+        Description annotation = clazz.getAnnotation(Description.class);
+        if (annotation != null) {
+          FunctionRegistry.registerTemporaryFunction(annotation.name(), clazz);
+        }
+      }
+    }
   }
 
   @Override

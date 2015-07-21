@@ -264,6 +264,7 @@ public final class FunctionRegistry {
     registerGenericUDF("date_add", GenericUDFDateAdd.class);
     registerGenericUDF("date_sub", GenericUDFDateSub.class);
     registerGenericUDF("datediff", GenericUDFDateDiff.class);
+    registerGenericUDF("date_format", GenericUDFDateFormat.class);
 
     registerUDF("get_json_object", UDFJson.class, false);
 
