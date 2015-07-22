@@ -26,6 +26,7 @@ import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
+import org.apache.hadoop.hive.serde2.io.TimestampWritable;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.io.FloatWritable;
@@ -92,6 +93,12 @@ public class GenericUDFOPMinus extends GenericUDFBaseNumeric {
     }
     decimalWritable.set(dec);
     return decimalWritable;
+  }
+
+  @Override
+  protected LongWritable evaluate(TimestampWritable left, TimestampWritable right) {
+    longWritable.set(left.getSeconds() - right.getSeconds());
+    return longWritable;
   }
 
   @Override

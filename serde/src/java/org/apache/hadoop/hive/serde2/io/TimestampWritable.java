@@ -124,6 +124,12 @@ public class TimestampWritable implements WritableComparable<TimestampWritable> 
     clearTimestamp();
   }
 
+  public void setTime(long time) {
+    timestamp.setTime(time);
+    bytesEmpty = true;
+    timestampEmpty = false;
+  }
+
   public void set(Timestamp t) {
     if (t == null) {
       timestamp.setTime(0);
