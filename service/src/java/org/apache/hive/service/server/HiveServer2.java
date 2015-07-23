@@ -65,8 +65,6 @@ public class HiveServer2 extends CompositeService {
       thriftCLIService = new ThriftBinaryCLIService(cliService);
     }
 
-    registerFunctions(hiveConf);
-
     addService(thriftCLIService);
     super.init(hiveConf);
   }
@@ -75,7 +73,8 @@ public class HiveServer2 extends CompositeService {
     String functions = hiveConf.get("navis.hiveserver2.init.functions", null);
     if (functions != null) {
       for (String function : functions.split(",")) {
-        Class<?> clazz = null;
+        LOG.warn("Trying to register function " + function);
+        Class<?> clazz;
         try {
           clazz = Class.forName(function.trim());
         } catch (Exception e) {
@@ -85,6 +84,7 @@ public class HiveServer2 extends CompositeService {
         Description annotation = clazz.getAnnotation(Description.class);
         if (annotation != null) {
           FunctionRegistry.registerTemporaryFunction(annotation.name(), clazz);
+          LOG.warn("Function [" + annotation.name() + "] is registered with class " + function);
         }
       }
     }
@@ -92,6 +92,7 @@ public class HiveServer2 extends CompositeService {
 
   @Override
   public synchronized void start() {
+    registerFunctions(getHiveConf());
     super.start();
   }
 

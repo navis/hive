@@ -66,7 +66,7 @@ public class GenericUDAFMin extends AbstractGenericUDAFResolver {
       // Note that on average the number of copies is log(N) so that's not
       // very important.
       outputOI = ObjectInspectorUtils.getStandardObjectInspector(inputOI,
-          ObjectInspectorCopyOption.JAVA);
+          ObjectInspectorCopyOption.WRITABLE);
       return outputOI;
     }
 
@@ -109,7 +109,7 @@ public class GenericUDAFMin extends AbstractGenericUDAFResolver {
         int r = ObjectInspectorUtils.compare(myagg.o, outputOI, partial, inputOI);
         if (myagg.o == null || r > 0) {
           myagg.o = ObjectInspectorUtils.copyToStandardObject(partial, inputOI,
-              ObjectInspectorCopyOption.JAVA);
+              ObjectInspectorCopyOption.WRITABLE);
         }
       }
     }

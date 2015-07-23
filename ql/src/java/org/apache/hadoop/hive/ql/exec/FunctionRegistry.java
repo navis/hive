@@ -266,6 +266,9 @@ public final class FunctionRegistry {
     registerGenericUDF("datediff", GenericUDFDateDiff.class);
     registerGenericUDF("date_format", GenericUDFDateFormat.class);
 
+    registerGenericUDF("timestampdiff", GenericUDFTimestampDiff.class);
+    registerGenericUDF("to_timestamp", GenericUDFToTimestamp.class);
+
     registerUDF("get_json_object", UDFJson.class, false);
 
     registerUDF("xpath_string", UDFXPathString.class, false);
