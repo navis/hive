@@ -417,7 +417,7 @@ public class PTFOperator extends Operator<PTFDesc> implements Serializable {
   }
 
   @Override
-  protected float overhead(float current) {
-    return current * 0.2f;
+  protected float overhead() {
+    return 0.3f;
   }
 }

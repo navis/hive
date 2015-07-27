@@ -537,27 +537,25 @@ public class DagUtils {
   private void initConf(String name, Collection<Operator<?>> operators, Configuration conf) {
     conf.unset(OP_BASE_LOAD);
     if (conf.getBoolean("navis.calculate.overhead", false)) {
-      float baseLoad = Operator.overhead(operators);
+      float baseLoad = Math.max(0.3f, Operator.overhead(operators));
       LOG.warn("Calculated overhead for " + name + " = " + baseLoad);
-      if (baseLoad > 1) {
-        conf.setFloat(OP_BASE_LOAD, baseLoad);
-        long minLengthPerGroup = conf.getLong(
-                TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE,
-                TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE_DEFAULT);
-        long maxLengthPerGroup = conf.getLong(
-                TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE,
-                TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE_DEFAULT);
+      conf.setFloat(OP_BASE_LOAD, baseLoad);
+      long minLengthPerGroup = conf.getLong(
+              TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE,
+              TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE_DEFAULT);
+      long maxLengthPerGroup = conf.getLong(
+              TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE,
+              TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE_DEFAULT);
 
-        conf.setLong(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE,
-                (long)(minLengthPerGroup / baseLoad));
-        conf.setLong(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE,
-                (long)(maxLengthPerGroup / baseLoad));
+      conf.setLong(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE,
+              (long)(minLengthPerGroup / baseLoad));
+      conf.setLong(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE,
+              (long)(maxLengthPerGroup / baseLoad));
 
-        LOG.warn("TEZ_GROUPING_SPLIT_MIN_SIZE for " + name + " = " +
-                conf.get(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE));
-        LOG.warn("TEZ_GROUPING_SPLIT_MIN_SIZE for " + name + " = " +
-                conf.get(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE));
-      }
+      LOG.warn("TEZ_GROUPING_SPLIT_MIN_SIZE for " + name + " = " +
+              conf.get(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE));
+      LOG.warn("TEZ_GROUPING_SPLIT_MIN_SIZE for " + name + " = " +
+              conf.get(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE));
     }
   }
 
@@ -626,6 +624,8 @@ public class DagUtils {
       }
     }
 
+    initConf(mapWork.getName(), mapWork.getAllRootOperators(), conf);
+
     // remember mapping of plan to input
     conf.set(Utilities.INPUT_NAME, mapWork.getName());
     if (HiveConf.getBoolVar(conf, ConfVars.HIVE_AM_SPLIT_GENERATION)
@@ -672,8 +672,6 @@ public class DagUtils {
         OperatorUtils.findOperators(mapWork.getAllRootOperators(), GroupByOperator.class).isEmpty() &&
         OperatorUtils.findOperators(mapWork.getAllRootOperators(), CommonJoinOperator.class).isEmpty() &&
         OperatorUtils.findOperators(mapWork.getAllRootOperators(), PTFOperator.class).isEmpty();
-
-    initConf(mapWork.getName(), mapWork.getAllRootOperators(), conf);
 
     Resource containerResource = getContainerResource(conf, simpleOperation);
     map = Vertex.create(mapWork.getName(), ProcessorDescriptor.create(procClassName)

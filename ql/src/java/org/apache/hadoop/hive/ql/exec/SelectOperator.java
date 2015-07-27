@@ -197,13 +197,13 @@ public class SelectOperator extends Operator<SelectDesc> implements Serializable
   }
 
   @Override
-  protected float overhead(float current) {
+  protected float overhead() {
     float overhead = 0;
     for (ExprNodeDesc expr : getConf().getColList()) {
       if (expr instanceof ExprNodeGenericFuncDesc) {
         overhead += 0.001f;
       }
     }
-    return current * overhead;
+    return overhead;
   }
 }

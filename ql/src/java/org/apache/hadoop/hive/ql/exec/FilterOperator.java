@@ -162,7 +162,7 @@ public class FilterOperator extends Operator<FilterDesc> implements
   }
 
   @Override
-  protected float overhead(float current) {
+  protected float overhead() {
     if (getStatistics() != null &&
             getNumParent() == 1 && getParentOperators().get(0).getStatistics() != null) {
       Statistics statp = getParentOperators().get(0).getStatistics();
@@ -170,7 +170,7 @@ public class FilterOperator extends Operator<FilterDesc> implements
       if (statc.getDataSize() > 0 && statp.getDataSize() > 0) {
         float reduction = (float) statc.getDataSize() / (float) statp.getDataSize();
         if (reduction < 1) {
-          return current * (reduction - 1) * 0.5f;
+          return (reduction - 1) * 0.5f;
         }
       }
     }

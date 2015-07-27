@@ -63,7 +63,6 @@ import org.apache.hadoop.hive.ql.plan.FileSinkDesc.DPSortState;
 import org.apache.hadoop.hive.ql.plan.ListBucketingCtx;
 import org.apache.hadoop.hive.ql.plan.PlanUtils;
 import org.apache.hadoop.hive.ql.plan.SkewedColumnPositionPair;
-import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
 import org.apache.hadoop.hive.ql.stats.StatsCollectionTaskIndependent;
 import org.apache.hadoop.hive.ql.stats.StatsPublisher;
@@ -83,7 +82,6 @@ import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.OutputFormat;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /**
@@ -1286,12 +1284,11 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
   }
 
   @Override
-  protected float overhead(float current) {
-    float overhead = 0.1f;
+  protected float overhead() {
     Class<?> output = conf.getTableInfo().getOutputFileFormatClass();
     if (output == OrcOutputFormat.class || output == OrcNewOutputFormat.class) {
-      overhead += 0.4f;
+      return 0.2f;
     }
-    return overhead;
+    return 0;
   }
 }
