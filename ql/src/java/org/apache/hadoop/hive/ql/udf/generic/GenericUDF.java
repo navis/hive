@@ -20,6 +20,7 @@ package org.apache.hadoop.hive.ql.udf.generic;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.Serializable;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -63,7 +64,7 @@ import org.apache.hadoop.io.LongWritable;
  * can do short-circuit evaluations using DeferedObject.
  */
 @UDFType(deterministic = true)
-public abstract class GenericUDF implements Closeable {
+public abstract class GenericUDF implements Closeable, Serializable {
 
   private static final String[] ORDINAL_SUFFIXES = new String[] { "th", "st", "nd", "rd", "th",
       "th", "th", "th", "th", "th" };
