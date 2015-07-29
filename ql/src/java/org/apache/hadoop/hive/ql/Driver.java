@@ -1117,10 +1117,7 @@ public class Driver implements CommandProcessor {
   }
 
   private int compileInternal(String command) {
-    int ret;
-    synchronized (compileMonitor) {
-      ret = compile(command);
-    }
+    int ret = compile(command);
     if (ret != 0) {
       try {
         releaseLocksAndCommitOrRollback(ctx.getHiveLocks(), false);
