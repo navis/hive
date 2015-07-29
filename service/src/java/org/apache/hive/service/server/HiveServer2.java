@@ -18,6 +18,9 @@
 
 package org.apache.hive.service.server;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -46,8 +49,11 @@ import org.apache.hadoop.hive.common.LogUtils;
 import org.apache.hadoop.hive.common.LogUtils.LogInitializationException;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+import org.apache.hadoop.hive.ql.Driver;
 import org.apache.hadoop.hive.ql.exec.spark.session.SparkSessionManagerImpl;
 import org.apache.hadoop.hive.ql.exec.tez.TezSessionPoolManager;
+import org.apache.hadoop.hive.ql.processors.CommandProcessorResponse;
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.ql.util.ZooKeeperHiveHelper;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.hive.shims.Utils;
@@ -333,7 +339,7 @@ public class HiveServer2 extends CompositeService {
     }
   }
 
-  private static void startHiveServer2() throws Throwable {
+  private static void startHiveServer2(String initScript) throws Throwable {
     long attempts = 0, maxAttempts = 1;
     while (true) {
       LOG.info("Starting HiveServer2");
@@ -359,6 +365,9 @@ public class HiveServer2 extends CompositeService {
         if (hiveConf.getVar(ConfVars.HIVE_EXECUTION_ENGINE).equals("spark")) {
           SparkSessionManagerImpl.getInstance().setup(hiveConf);
         }
+        if (initScript != null) {
+          runScript(initScript, hiveConf);
+        }
         break;
       } catch (Throwable throwable) {
         if (server != null) {
@@ -383,6 +392,52 @@ public class HiveServer2 extends CompositeService {
         }
       }
     }
+  }
+
+  private static void runScript(String initScript, HiveConf hiveConf) throws Exception {
+    File file = new File(initScript);
+    if (!file.exists() || file.isDirectory()) {
+      LOG.warn("Failed to find init-script in " + initScript);
+      return;
+    }
+    SessionState.start(hiveConf);
+    Driver driver = new Driver(hiveConf);
+    for (String command : getCommands(initScript)) {
+      LOG.warn("Executing command " + command);
+      CommandProcessorResponse response = driver.run(command);
+      if (response.getResponseCode() != 0) {
+        LOG.warn("Failed to execute command " + command);
+      }
+      driver.close();
+    }
+  }
+
+  private static List<String> getCommands(String initScript) throws IOException {
+    LOG.warn("Reading script " + initScript);
+    BufferedReader reader = new BufferedReader(new FileReader(initScript));
+
+    List<String> commands = new ArrayList<String>();
+    StringBuilder builder = new StringBuilder();
+    String line;
+    while ((line = reader.readLine()) != null) {
+      String trimmed = line.trim();
+      if (trimmed.isEmpty()) {
+        continue;
+      }
+      boolean next = trimmed.endsWith(";");
+      if (next) {
+        line = line.substring(0, line.lastIndexOf(';'));
+      }
+      builder.append(line).append('\n');
+      if (next) {
+        commands.add(builder.toString());
+        builder.setLength(0);
+      }
+    }
+    if (builder.length() > 0) {
+      commands.add(builder.toString());
+    }
+    return commands;
   }
 
   /**
@@ -496,6 +551,13 @@ public class HiveServer2 extends CompositeService {
           .withLongOpt("deregister")
           .withDescription("Deregister all instances of given version from dynamic service discovery")
           .create());
+      // -i <init-script>
+      options.addOption(OptionBuilder
+          .hasArgs(1)
+          .withArgName("initScript")
+          .withDescription("Location of init script")
+          .create('i'));
+
       options.addOption(new Option("H", "help", false, "Print help information"));
     }
 
@@ -528,7 +590,8 @@ public class HiveServer2 extends CompositeService {
         System.exit(-1);
       }
       // Default executor, when no option is specified
-      return new ServerOptionsProcessorResponse(new StartOptionExecutor());
+      return new ServerOptionsProcessorResponse(
+          new StartOptionExecutor(commandLine.getOptionValue('i')));
     }
 
     StringBuilder getDebugMessage() {
@@ -582,10 +645,16 @@ public class HiveServer2 extends CompositeService {
    * This is the default executor, when no option is specified.
    */
   static class StartOptionExecutor implements ServerOptionsExecutor {
+
+    private final String initScript;
+    public StartOptionExecutor(String initScript) {
+      this.initScript = initScript;
+    }
+
     @Override
     public void execute() {
       try {
-        startHiveServer2();
+        startHiveServer2(initScript);
       } catch (Throwable t) {
         LOG.fatal("Error starting HiveServer2", t);
         System.exit(-1);
