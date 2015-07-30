@@ -343,6 +343,12 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     for (InputSplit is : iss) {
       result.add(new HiveInputSplit(is, inputFormatClass.getName()));
     }
+    if (baseLoad > 1) {
+      conf.setLong(MIN_SPLIT_SIZE, minSplit);
+      conf.setLong(MAX_SPLIT_SIZE, maxSplit);
+      conf.setLong(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE, minLengthPerGroup);
+      conf.setLong(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE, maxLengthPerGroup);
+    }
   }
 
   public static float baseLoad(Configuration conf) {
