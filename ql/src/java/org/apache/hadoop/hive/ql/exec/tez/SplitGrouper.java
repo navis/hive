@@ -44,6 +44,7 @@ import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.split.TezGroupedSplit;
 import org.apache.hadoop.mapred.split.TezMapredSplitsGrouper;
+import org.apache.hadoop.mapreduce.split.TezMapReduceSplitsGrouper;
 import org.apache.tez.dag.api.TaskLocationHint;
 
 import com.google.common.collect.ArrayListMultimap;
@@ -112,14 +113,34 @@ public class SplitGrouper {
     Multimap<Integer, InputSplit> bucketGroupedSplitMultimap =
         ArrayListMultimap.<Integer, InputSplit> create();
 
+    final long minLengthPerGroup = conf.getLong(
+            TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE,
+            TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE_DEFAULT);
+    final long maxLengthPerGroup = conf.getLong(
+            TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE,
+            TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE_DEFAULT);
+
     // use the tez grouper to combine splits once per bucket
     for (int bucketId : splitMap.keySet()) {
       Collection<InputSplit> inputSplitCollection = splitMap.get(bucketId);
+      if (inputSplitCollection.isEmpty()) {
+        continue;
+      }
+      InputSplit[] rawSplits =
+              inputSplitCollection.toArray(new InputSplit[inputSplitCollection.size()]);
+      HiveInputFormat.HiveInputSplit hsplit = (HiveInputFormat.HiveInputSplit) rawSplits[0];
+      InputSplit inputSplit = hsplit.getInputSplit();
+      if (inputSplit instanceof OrcSplit && ((OrcSplit) inputSplit).isCombineable()) {
+        float loadFactor = 1 + (((OrcSplit) inputSplit).loadFactor() - 1) / 2;
+        long newMinLengthPerGroup = (long) (minLengthPerGroup / loadFactor);
+        long newMaxLengthPerGroup = (long) (maxLengthPerGroup / loadFactor);
+        conf.setLong(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE, newMinLengthPerGroup);
+        conf.setLong(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE, newMaxLengthPerGroup);
+      }
 
-      InputSplit[] rawSplits = inputSplitCollection.toArray(new InputSplit[0]);
       InputSplit[] groupedSplits =
           tezGrouper.getGroupedSplits(conf, rawSplits, bucketTaskMap.get(bucketId),
-              HiveInputFormat.class.getName());
+                  HiveInputFormat.class.getName());
 
       LOG.warn("Original split size is " + rawSplits.length + " grouped split size is "
               + groupedSplits.length + ", for bucket: " + bucketId);
@@ -127,6 +148,8 @@ public class SplitGrouper {
       for (InputSplit inSplit : groupedSplits) {
         bucketGroupedSplitMultimap.put(bucketId, inSplit);
       }
+      conf.setLong(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE, minLengthPerGroup);
+      conf.setLong(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE, maxLengthPerGroup);
     }
 
     return bucketGroupedSplitMultimap;

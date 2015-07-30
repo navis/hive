@@ -28,7 +28,6 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
-import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.SelectDesc;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
 
@@ -196,14 +195,4 @@ public class SelectOperator extends Operator<SelectDesc> implements Serializable
     return true;
   }
 
-  @Override
-  protected float overhead() {
-    float overhead = 0;
-    for (ExprNodeDesc expr : getConf().getColList()) {
-      if (expr instanceof ExprNodeGenericFuncDesc) {
-        overhead += 0.001f;
-      }
-    }
-    return overhead;
-  }
 }

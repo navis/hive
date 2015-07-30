@@ -758,7 +758,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
 
     OrcSplit createSplit(long offset, long length,
                          ReaderImpl.FileMetaInfo fileMetaInfo) throws IOException {
-      return createSplit(offset, length, fileMetaInfo, false);
+      return createSplit(offset, length, fileMetaInfo, 1.0f);
     }
 
     /**
@@ -772,8 +772,9 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
      * @throws IOException
      */
     OrcSplit createSplit(long offset, long length,
-                     ReaderImpl.FileMetaInfo fileMetaInfo, boolean split) throws IOException {
-      LOG.warn("---- createSplit " + offset + "~" + (offset + length) + (split ? " (split)" : ""));
+                     ReaderImpl.FileMetaInfo fileMetaInfo, float loadMultiplier)
+            throws IOException {
+      LOG.warn("---- createSplit " + offset + "~" + (offset + length) + (loadMultiplier < 0 ? " (split)" : ""));
       String[] hosts;
       Map.Entry<Long, BlockLocation> startEntry = locations.floorEntry(offset);
       BlockLocation start = startEntry.getValue();
@@ -827,7 +828,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
         hostList.toArray(hosts);
       }
       return new OrcSplit(file.getPath(), offset, length, hosts, fileMetaInfo,
-          isOriginal, hasBase, deltas, projColsUncompressedSize, !split);
+          isOriginal, hasBase, deltas, projColsUncompressedSize, loadMultiplier);
     }
 
     /**
@@ -839,17 +840,17 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
       populateAndCacheStripeDetails();
 
       float baseLoad = context.conf.getFloat(DagUtils.OP_BASE_LOAD, 1.0f);
-      float loadMultiplier = 1.0f;
+      float loadFactor = 1.0f;
       if (context.conf.getBoolean("navis.calculate.overhead", false)) {
-        loadMultiplier = context.conf.getFloat("navis.calculate.overhead.orc", 3.0f);
+        loadFactor = context.conf.getFloat("navis.calculate.overhead.orc", 3.0f);
         ReaderImpl.FileMetaInfo metaInfo = fileMetaInfo != null ? fileMetaInfo : fileInfo.fileMetaInfo;
         if (metaInfo != null && metaInfo.compressionType != null && !metaInfo.compressionType.isEmpty()) {
-          loadMultiplier *= context.conf.getFloat("navis.calculate.overhead.orc.compressed", 4.0f);
+          loadFactor *= context.conf.getFloat("navis.calculate.overhead.orc.compressed", 4.0f);
         }
       }
-      long threshold = (long)(context.maxSize / loadMultiplier);  // make it smaller
+      long threshold = (long)(context.maxSize / loadFactor);  // make it smaller
       LOG.warn("Start SplitGenerator.call :: try " + file + " split with baseLoad : " + baseLoad +
-               ", loadMultiplier : " + loadMultiplier + " resulting threshold " + threshold);
+               ", loadFactor : " + loadFactor + " resulting threshold " + threshold);
       List<OrcSplit> splits = Lists.newArrayList();
 
       // figure out which stripes we need to read
@@ -904,7 +905,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
         if (!includeStripe[idx]) {
           // create split for the previous unfinished stripe
           if (currentOffset != -1) {
-            splits.add(createSplit(currentOffset, currentLength, fileMetaInfo, split));
+            splits.add(createSplit(currentOffset, currentLength, fileMetaInfo, split ? -1 : loadFactor));
             currentOffset = -1;
           }
           continue;
@@ -914,7 +915,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
         // crossed a block boundary, cut the input split here.
         if (currentOffset != -1 && currentLength > context.minSize &&
             (currentOffset / blockSize != stripe.getOffset() / blockSize)) {
-          splits.add(createSplit(currentOffset, currentLength, fileMetaInfo, split));
+          splits.add(createSplit(currentOffset, currentLength, fileMetaInfo, split ? -1 : loadFactor));
           currentOffset = -1;
         }
         // if we aren't building a split, start a new one.
@@ -926,12 +927,13 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
               (stripe.getOffset() + stripe.getLength()) - currentOffset;
         }
         if (currentLength >= threshold) {
-          splits.add(createSplit(currentOffset, currentLength, fileMetaInfo, split = true));
+          split = true;
+          splits.add(createSplit(currentOffset, currentLength, fileMetaInfo, -1));
           currentOffset = -1;
         }
       }
       if (currentOffset != -1) {
-        splits.add(createSplit(currentOffset, currentLength, fileMetaInfo, split));
+        splits.add(createSplit(currentOffset, currentLength, fileMetaInfo, split ? -1 : loadFactor));
       }
 
       // add uncovered ACID delta splits

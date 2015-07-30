@@ -59,7 +59,6 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobConfigurable;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.Reporter;
-import org.apache.hadoop.mapreduce.split.TezMapReduceSplitsGrouper;
 import org.apache.hive.common.util.ReflectionUtil;
 
 /**
@@ -318,26 +317,12 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     long minSplit = minSplit(conf);
     long maxSplit = maxSplit(conf);
 
-    long minLengthPerGroup = conf.getLong(
-            TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE,
-            TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE_DEFAULT);
-    long maxLengthPerGroup = conf.getLong(
-            TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE,
-            TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE_DEFAULT);
-
     if (baseLoad > 1) {
       conf.setLong(MIN_SPLIT_SIZE, (long)(minSplit / baseLoad));
       conf.setLong(MAX_SPLIT_SIZE, (long)(maxSplit / baseLoad));
-      conf.setLong(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE,
-              (long)(minLengthPerGroup / baseLoad));
-      conf.setLong(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE,
-              (long)(maxLengthPerGroup / baseLoad));
       LOG.warn("Thresholds for splits are modified as " +
               "MIN_SPLIT : " + (long) (minSplit / baseLoad) + ", " +
-              "MAX_SPLIT : " + (long) (maxSplit / baseLoad) + ", " +
-              "GROUP_MIN_SPLIT : " + (long) (minLengthPerGroup / baseLoad) + ", " +
-              "GROUP_MAX_SPLIT : " + (long) (maxLengthPerGroup / baseLoad) +
-              " by baseLoad " + baseLoad);
+              "MAX_SPLIT : " + (long) (maxSplit / baseLoad) + " by baseLoad " + baseLoad);
     }
     InputSplit[] iss = inputFormat.getSplits(conf, splits);
     for (InputSplit is : iss) {
@@ -346,8 +331,6 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     if (baseLoad > 1) {
       conf.setLong(MIN_SPLIT_SIZE, minSplit);
       conf.setLong(MAX_SPLIT_SIZE, maxSplit);
-      conf.setLong(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MIN_SIZE, minLengthPerGroup);
-      conf.setLong(TezMapReduceSplitsGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE, maxLengthPerGroup);
     }
   }
 
