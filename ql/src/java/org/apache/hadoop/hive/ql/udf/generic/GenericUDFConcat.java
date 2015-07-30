@@ -27,6 +27,7 @@ import org.apache.hadoop.hive.ql.exec.vector.expressions.StringConcatColCol;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.StringConcatColScalar;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.StringConcatScalarCol;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.serde2.objectinspector.ConstantObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
@@ -57,6 +58,8 @@ public class GenericUDFConcat extends GenericUDF {
   private transient PrimitiveCategory returnType = PrimitiveCategory.STRING;
   private transient BytesWritable[] bw;
   private transient GenericUDFUtils.StringHelper returnHelper;
+
+  private transient Object[] constants;
 
   @Override
   public ObjectInspector initialize(ObjectInspector[] arguments) throws UDFArgumentException {
@@ -121,6 +124,18 @@ public class GenericUDFConcat extends GenericUDF {
       }
     }
 
+    constants = new Object[arguments.length];
+    for (int idx = 0; idx < arguments.length; ++idx) {
+      poi = (PrimitiveObjectInspector)arguments[idx];
+      if (poi instanceof ConstantObjectInspector) {
+        Object constant = ((ConstantObjectInspector) poi).getWritableConstantValue();
+        if (constant != null) {
+          constants[idx] = returnType ==
+              PrimitiveCategory.BINARY ? ((BytesWritable)constant).copyBytes() : constant.toString();
+        }
+      }
+    }
+
     if (returnType == PrimitiveCategory.BINARY) {
       bw = new BytesWritable[arguments.length];
       return PrimitiveObjectInspectorFactory.writableBinaryObjectInspector;
@@ -181,9 +196,15 @@ public class GenericUDFConcat extends GenericUDF {
     return new BytesWritable(out);
   }
 
+  private transient final StringBuilder sb = new StringBuilder();
+
   public String stringEvaluate(DeferredObject[] arguments) throws HiveException {
-    StringBuilder sb = new StringBuilder();
+    sb.setLength(0);
     for (int idx = 0; idx < arguments.length; ++idx) {
+      if (constants[idx] != null) {
+        sb.append((String)constants[idx]);
+        continue;
+      }
       String val = null;
       if (arguments[idx] != null) {
         val = (String) stringConverters[idx].convert(arguments[idx].get());
