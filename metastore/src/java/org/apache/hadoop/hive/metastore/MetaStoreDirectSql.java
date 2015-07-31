@@ -1070,6 +1070,7 @@ class MetaStoreDirectSql {
     if (colNames.isEmpty()) {
       return null;
     }
+    doDbSpecificInitializationsBeforeQuery();
     boolean doTrace = LOG.isDebugEnabled();
     long start = doTrace ? System.nanoTime() : 0;
     String queryText = "select " + STATS_COLLIST + " from \"TAB_COL_STATS\" "
@@ -1499,6 +1500,7 @@ class MetaStoreDirectSql {
     if (colNames.isEmpty() || partNames.isEmpty()) {
       return Lists.newArrayList();
     }
+    doDbSpecificInitializationsBeforeQuery();
     boolean doTrace = LOG.isDebugEnabled();
     long start = doTrace ? System.nanoTime() : 0;
     String queryText = "select \"PARTITION_NAME\", " + STATS_COLLIST + " from \"PART_COL_STATS\""
