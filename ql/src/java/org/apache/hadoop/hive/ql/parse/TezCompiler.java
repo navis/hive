@@ -317,8 +317,6 @@ public class TezCompiler extends TaskCompiler {
       List<Task<MoveWork>> mvTask, Set<ReadEntity> inputs, Set<WriteEntity> outputs)
       throws SemanticException {
 
-    GenTezUtils.getUtils().resetSequenceNumber();
-
     ParseContext tempParseContext = getParseContext(pCtx, rootTasks);
     GenTezWork genTezWork = new GenTezWork(GenTezUtils.getUtils());
 

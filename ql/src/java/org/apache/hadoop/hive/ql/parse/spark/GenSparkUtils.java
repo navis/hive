@@ -72,21 +72,11 @@ public class GenSparkUtils {
   // sequence number is used to name vertices (e.g.: Map 1, Reduce 14, ...)
   private int sequenceNumber = 0;
 
-  // singleton
-  private static GenSparkUtils utils;
-
   public static GenSparkUtils getUtils() {
-    if (utils == null) {
-      utils = new GenSparkUtils();
-    }
-    return utils;
+    return new GenSparkUtils();
   }
 
   protected GenSparkUtils() {
-  }
-
-  public void resetSequenceNumber() {
-    sequenceNumber = 0;
   }
 
   public ReduceWork createReduceWork(GenSparkProcContext context, Operator<?> root,
@@ -94,7 +84,7 @@ public class GenSparkUtils {
     Preconditions.checkArgument(!root.getParentOperators().isEmpty(),
         "AssertionError: expected root.getParentOperators() to be non-empty");
 
-    ReduceWork reduceWork = new ReduceWork("Reducer " + (++sequenceNumber));
+    ReduceWork reduceWork = new ReduceWork("Reducer " + getNextSeqNumber());
     LOG.debug("Adding reduce work (" + reduceWork.getName() + ") for " + root);
     reduceWork.setReducer(root);
     reduceWork.setNeedsTagging(GenMapRedUtils.needsTagging(reduceWork));
@@ -147,7 +137,7 @@ public class GenSparkUtils {
       SparkWork sparkWork, PrunedPartitionList partitions, boolean deferSetup) throws SemanticException {
     Preconditions.checkArgument(root.getParentOperators().isEmpty(),
         "AssertionError: expected root.getParentOperators() to be empty");
-    MapWork mapWork = new MapWork("Map " + (++sequenceNumber));
+    MapWork mapWork = new MapWork("Map " + getNextSeqNumber());
     LOG.debug("Adding map work (" + mapWork.getName() + ") for " + root);
 
     // map work starts with table scan operators

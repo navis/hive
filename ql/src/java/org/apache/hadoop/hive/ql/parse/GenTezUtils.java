@@ -70,21 +70,11 @@ public class GenTezUtils {
   // sequence number is used to name vertices (e.g.: Map 1, Reduce 14, ...)
   private int sequenceNumber = 0;
 
-  // singleton
-  private static GenTezUtils utils;
-
   public static GenTezUtils getUtils() {
-    if (utils == null) {
-      utils = new GenTezUtils();
-    }
-    return utils;
+    return new GenTezUtils();
   }
 
   protected GenTezUtils() {
-  }
-
-  public void resetSequenceNumber() {
-    sequenceNumber = 0;
   }
 
   public UnionWork createUnionWork(GenTezProcContext context, Operator<?> root, Operator<?> leaf, TezWork tezWork) {
