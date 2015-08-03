@@ -987,9 +987,7 @@ public class VectorizationContext {
     VectorExpressionDescriptor.Descriptor descriptor = builder.build();
     Class<?> vclass = this.vMap.getVectorExpressionClass(udf, descriptor);
     if (vclass == null) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("No vector udf found for "+udf.getSimpleName() + ", descriptor: "+descriptor);
-      }
+      LOG.info("No vector udf found for "+udf.getSimpleName() + ", descriptor: "+descriptor);
       return null;
     }
     Mode childrenMode = getChildrenMode(mode, udf);
@@ -1489,6 +1487,8 @@ public class VectorizationContext {
       return createVectorExpression(CastDecimalToString.class, childExpr, Mode.PROJECTION, returnType);
     } else if (isDateFamily(inputType)) {
       return createVectorExpression(CastDateToString.class, childExpr, Mode.PROJECTION, returnType);
+    } else if (isStringFamily(inputType)) {
+      return createVectorExpression(CastStringGroupToString.class, childExpr, Mode.PROJECTION, returnType);
     }
     /* The string type is deliberately omitted -- the planner removes string to string casts.
      * Timestamp, float, and double types are handled by the legacy code path. See isLegacyPathUDF.
