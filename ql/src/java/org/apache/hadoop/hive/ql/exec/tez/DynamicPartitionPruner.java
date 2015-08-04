@@ -106,7 +106,7 @@ public class DynamicPartitionPruner {
     this.context = context;
     this.work = work;
     this.jobConf = jobConf;
-    synchronized (this) {
+    synchronized (sourcesWaitingForEvents) {
       initialize();
     }
   }
@@ -116,21 +116,11 @@ public class DynamicPartitionPruner {
       InterruptedException, HiveException {
 
     synchronized(sourcesWaitingForEvents) {
-
       if (sourcesWaitingForEvents.isEmpty()) {
         return;
       }
-
-      Set<VertexState> states = Collections.singleton(VertexState.SUCCEEDED);
-      for (String source : sourcesWaitingForEvents) {
-        // we need to get state transition updates for the vertices that will send
-        // events to us. once we have received all events and a vertex has succeeded,
-        // we can move to do the pruning.
-        context.registerForVertexStateUpdates(source, states);
-      }
     }
 
-    LOG.info("Waiting for events (" + sourceInfoCount + " sources) ...");
     // synchronous event processing loop. Won't return until all events have
     // been processed.
     this.processEvents();
@@ -138,17 +128,7 @@ public class DynamicPartitionPruner {
     LOG.info("Ok to proceed.");
   }
 
-  public BlockingQueue<Object> getQueue() {
-    return queue;
-  }
-
-  private void clear() {
-    sourceInfoMap.clear();
-    sourceInfoCount = 0;
-  }
-
   private void initialize() throws SerDeException {
-    this.clear();
     Map<String, SourceInfo> columnMap = new HashMap<String, SourceInfo>();
     // sources represent vertex names
     Set<String> sources = work.getEventSourceTableDescMap().keySet();
@@ -195,6 +175,18 @@ public class DynamicPartitionPruner {
         }
         columnMap.put(columnName, si);
       }
+    }
+
+    if (!sourcesWaitingForEvents.isEmpty()) {
+      Set<VertexState> states = Collections.singleton(VertexState.SUCCEEDED);
+      for (String source : sourcesWaitingForEvents) {
+        // we need to get state transition updates for the vertices that will send
+        // events to us. once we have received all events and a vertex has succeeded,
+        // we can move to do the pruning.
+        context.registerForVertexStateUpdates(source, states);
+      }
+
+      LOG.info("Waiting for events (" + sourceInfoCount + " sources) ...");
     }
   }
 
@@ -476,6 +468,8 @@ public class DynamicPartitionPruner {
         numEventsSeenPerSource.get(event.getSourceVertexName()).increment();
         queue.offer(event);
         checkForSourceCompletion(event.getSourceVertexName());
+      } else {
+        LOG.info("Arrived event from " + event.getSourceVertexName() + ", which was not expected");
       }
     }
   }
