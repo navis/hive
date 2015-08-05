@@ -214,6 +214,7 @@ public abstract class VectorMapJoinOuterGenerateResultOperator
             }
           }
         }
+        matchCount = batch.size;
         System.arraycopy(batch.selected, 0, matchs, 0, matchCount);
       }
     }
