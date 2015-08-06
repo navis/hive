@@ -1717,8 +1717,13 @@ public class WriterImpl implements Writer, MemoryManager.Callback {
       fields = structObjectInspector.getAllStructFieldRefs();
       childrenWriters = new TreeWriter[fields.size()];
       for(int i=0; i < childrenWriters.length; ++i) {
-        childrenWriters[i] = createTreeWriter(
-          fields.get(i).getFieldObjectInspector(), writer, true);
+        try {
+          childrenWriters[i] = createTreeWriter(
+            fields.get(i).getFieldObjectInspector(), writer, true);
+        } catch (IllegalArgumentException e) {
+          throw new IllegalArgumentException(e.getMessage() +
+              " for field " + fields.get(i).getFieldName());
+        }
       }
       recordPosition(rowIndexPosition);
     }
