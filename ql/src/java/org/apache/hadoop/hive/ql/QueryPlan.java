@@ -116,11 +116,11 @@ public class QueryPlan implements Serializable {
 
     rootTasks = new ArrayList<Task<? extends Serializable>>();
     this.reducerTimeStatsPerJobList = new ArrayList<ReducerTimeStatsPerJob>();
-    rootTasks.addAll(sem.getRootTasks());
+    rootTasks.addAll(sem.getRealRootTasks());
     fetchTask = sem.getFetchTask();
     // Note that inputs and outputs can be changed when the query gets executed
-    inputs = sem.getInputs();
-    outputs = sem.getOutputs();
+    inputs = sem.getAllInputs();
+    outputs = sem.getAllOutputs();
     linfo = sem.getLineageInfo();
     tableAccessInfo = sem.getTableAccessInfo();
     columnAccessInfo = sem.getColumnAccessInfo();

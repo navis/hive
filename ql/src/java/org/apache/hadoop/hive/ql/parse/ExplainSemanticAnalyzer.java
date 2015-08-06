@@ -75,7 +75,7 @@ public class ExplainSemanticAnalyzer extends BaseSemanticAnalyzer {
     sem.validate();
 
     ctx.setResFile(ctx.getLocalTmpPath());
-    List<Task<? extends Serializable>> tasks = sem.getRootTasks();
+    List<Task<? extends Serializable>> tasks = sem.getRealRootTasks();
     if (tasks == null) {
       tasks = Collections.emptyList();
     }

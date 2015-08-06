@@ -297,6 +297,21 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
     return ret;
   }
 
+  public static List<Task<?>> findLeafs(List<Task<? extends Serializable>> rootTasks) {
+    final List<Task<?>> leafTasks = new ArrayList<Task<?>>();
+
+    List<Task<?>> targets = new ArrayList<>(rootTasks);
+    NodeUtils.iterateTask(targets, Task.class, new NodeUtils.Function<Task>() {
+      public void apply(Task task) {
+        List dependents = task.getDependentTasks();
+        if (dependents == null || dependents.isEmpty()) {
+          leafTasks.add(task);
+        }
+      }
+    });
+    return leafTasks;
+  }
+
   /**
    * Remove the dependent task.
    *

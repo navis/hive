@@ -22,19 +22,9 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.sql.Date;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
 
-import org.antlr.runtime.tree.CommonTree;
 import org.antlr.runtime.tree.Tree;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -43,7 +33,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.HiveMetaStore;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -75,7 +64,6 @@ import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorConverters;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
-import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -85,6 +73,52 @@ import com.google.common.annotations.VisibleForTesting;
  *
  */
 public abstract class BaseSemanticAnalyzer {
+
+  protected final List<BaseSemanticAnalyzer> parents = new ArrayList<>();
+
+  public List<Task<? extends Serializable>> getRealRootTasks() {
+    return getRealRootTasks(Collections.<Task<?>>emptyList());
+  }
+
+  private List<Task<?>> getRealRootTasks(List<Task<?>> childTasks) {
+    List<Task<?>> parentLeafTasks = new ArrayList<Task<?>>();
+    for (BaseSemanticAnalyzer parent : parents) {
+      parentLeafTasks.addAll(parent.getRealRootTasks(rootTasks));
+    }
+    List<Task<?>> leafTasks = Task.findLeafs(rootTasks);
+    for (Task<?> leafTask : leafTasks) {
+      for (Task<?> childTask : childTasks) {
+        LOG.warn(leafTask.getId() + " --> " + childTask.getId());
+        leafTask.addDependentTask(childTask);
+      }
+    }
+    return parentLeafTasks.isEmpty() ? rootTasks : parentLeafTasks;
+  }
+
+  public HashSet<ReadEntity> getAllInputs() {
+    return getAllInputs(new HashSet<ReadEntity>());
+  }
+
+  private HashSet<ReadEntity> getAllInputs(HashSet<ReadEntity> inputs) {
+    for (BaseSemanticAnalyzer parent : parents) {
+      parent.getAllInputs(inputs);
+    }
+    inputs.addAll(this.inputs);
+    return inputs;
+  }
+
+  public HashSet<WriteEntity> getAllOutputs() {
+    return getAllOutputs(new HashSet<WriteEntity>());
+  }
+
+  private HashSet<WriteEntity> getAllOutputs(HashSet<WriteEntity> outputs) {
+    for (BaseSemanticAnalyzer parent : parents) {
+      parent.getAllOutputs(outputs);
+    }
+    outputs.addAll(this.outputs);
+    return outputs;
+  }
+
   protected static final Log STATIC_LOG = LogFactory.getLog(BaseSemanticAnalyzer.class.getName());
   protected final Hive db;
   protected final HiveConf conf;

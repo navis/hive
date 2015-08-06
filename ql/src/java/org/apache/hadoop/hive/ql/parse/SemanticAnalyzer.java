@@ -284,6 +284,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * Capture the CTE definitions in a Query.
    */
   private final Map<String, ASTNode> aliasToCTEs;
+
   /*
    * Used to check recursive CTE invocations. Similar to viewsExpanded
    */
@@ -326,9 +327,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     prunedPartitions = new HashMap<String, PrunedPartitionList>();
     unparseTranslator = new UnparseTranslator(conf);
     autogenColAliasPrfxLbl = HiveConf.getVar(conf,
-        HiveConf.ConfVars.HIVE_AUTOGEN_COLUMNALIAS_PREFIX_LABEL);
+            HiveConf.ConfVars.HIVE_AUTOGEN_COLUMNALIAS_PREFIX_LABEL);
     autogenColAliasPrfxIncludeFuncName = HiveConf.getBoolVar(conf,
-        HiveConf.ConfVars.HIVE_AUTOGEN_COLUMNALIAS_PREFIX_INCLUDEFUNCNAME);
+            HiveConf.ConfVars.HIVE_AUTOGEN_COLUMNALIAS_PREFIX_INCLUDEFUNCNAME);
     queryProperties = new QueryProperties();
     opToPartToSkewedPruner = new HashMap<TableScanOperator, Map<String, ExprNodeDesc>>();
     aliasToCTEs = new HashMap<String, ASTNode>();
@@ -914,6 +915,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       if ( aliasToCTEs.containsKey(qName)) {
         throw new SemanticException(ErrorMsg.AMBIGUOUS_TABLE_ALIAS.getMsg(cte.getChild(1)));
       }
+      LOG.warn("Added CTE " + qName);
       aliasToCTEs.put(qName, cteQry);
     }
   }
@@ -958,6 +960,42 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       qId.setLength(lastIndex);
     }
     return aliasToCTEs.get(cteName);
+  }
+
+  private Table materializeCTE(String cteName, ASTNode cteQryNode) throws HiveException {
+
+    ASTNode createTable = new ASTNode(new ClassicToken(HiveParser.TOK_CREATETABLE));
+
+    ASTNode tableName = new ASTNode(new ClassicToken(HiveParser.TOK_TABNAME));
+    tableName.addChild(new ASTNode(new ClassicToken(HiveParser.Identifier, cteName)));
+
+    ASTNode temporary = new ASTNode(new ClassicToken(HiveParser.KW_TEMPORARY));
+
+    createTable.addChild(tableName);
+    createTable.addChild(temporary);
+    createTable.addChild(cteQryNode);
+
+    SemanticAnalyzer analyzer = new SemanticAnalyzer(conf);
+    analyzer.initCtx(ctx);
+    analyzer.init(false);
+
+    // share cte contexts
+    analyzer.aliasToCTEs.putAll(aliasToCTEs);
+
+    HiveOperation operation = SessionState.get().getHiveOperation();
+    try {
+      analyzer.analyzeInternal(createTable);
+    } finally {
+      SessionState.get().setCommandType(operation);
+    }
+    analyzer.tableDesc.setVolatile(true);
+
+    Table table = analyzer.tableDesc.toTable(conf);
+
+    LOG.warn("Materialized " + cteName + " into " + table.getDataLocation());
+    ctx.addVolatileTable(cteName, table);
+    parents.add(analyzer);
+    return table;
   }
 
   /*
@@ -1549,31 +1587,37 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
       for (String alias : tabAliases) {
         String tab_name = qb.getTabNameForAlias(alias);
+        String cte_name = tab_name.toLowerCase();
         Table tab = db.getTable(tab_name, false);
+        if (tab == null) {
+          tab = ctx.getVolatileTable(cte_name);
+        }
         if (tab == null) {
           /*
            * if this s a CTE reference:
            * Add its AST as a SubQuery to this QB.
            */
-          ASTNode cteNode = findCTEFromName(qb, tab_name.toLowerCase());
-          if ( cteNode != null ) {
-            String cte_name = tab_name.toLowerCase();
-            if (ctesExpanded.contains(cte_name)) {
-              throw new SemanticException("Recursive cte " + tab_name +
-                  " detected (cycle: " + StringUtils.join(ctesExpanded, " -> ") +
-                  " -> " + tab_name + ").");
+          ASTNode cteNode = findCTEFromName(qb, cte_name);
+          if (cteNode == null) {
+            LOG.warn("Failed to find CTE " + cte_name + "from " + aliasToCTEs.values());
+            ASTNode src = qb.getParseInfo().getSrcForAlias(alias);
+            if (src != null) {
+              throw new SemanticException(ErrorMsg.INVALID_TABLE.getMsg(src));
             }
+            throw new SemanticException(ErrorMsg.INVALID_TABLE.getMsg(alias));
+          }
+
+          if (ctesExpanded.contains(cte_name)) {
+            throw new SemanticException("Recursive cte " + tab_name +
+                    " detected (cycle: " + StringUtils.join(ctesExpanded, " -> ") +
+                    " -> " + tab_name + ").");
+          }
+          if (!conf.getBoolean("navis.materialize.cte", true)) {
             addCTEAsSubQuery(qb, cte_name, alias);
             sqAliasToCTEName.put(alias, cte_name);
             continue;
           }
-          ASTNode src = qb.getParseInfo().getSrcForAlias(alias);
-          if (null != src) {
-            throw new SemanticException(ErrorMsg.INVALID_TABLE.getMsg(src));
-          } else {
-            throw new SemanticException(ErrorMsg.INVALID_TABLE.getMsg(alias));
-          }
-
+          tab = materializeCTE(cte_name, cteNode);
         }
 
         // Disallow INSERT INTO on bucketized tables

@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -68,17 +69,18 @@ public class GenTezUtils {
   static final private Log LOG = LogFactory.getLog(GenTezUtils.class.getName());
 
   // sequence number is used to name vertices (e.g.: Map 1, Reduce 14, ...)
-  private int sequenceNumber = 0;
+  private final AtomicInteger sequencer;
 
-  public static GenTezUtils getUtils() {
-    return new GenTezUtils();
+  public GenTezUtils() {
+    this.sequencer = new AtomicInteger();
   }
 
-  protected GenTezUtils() {
+  public GenTezUtils(AtomicInteger sequencer) {
+    this.sequencer = sequencer;
   }
 
   public UnionWork createUnionWork(GenTezProcContext context, Operator<?> root, Operator<?> leaf, TezWork tezWork) {
-    UnionWork unionWork = new UnionWork("Union "+ (++sequenceNumber));
+    UnionWork unionWork = new UnionWork("Union "+ (sequencer.incrementAndGet()));
     context.rootUnionWorkMap.put(root, unionWork);
     context.unionWorkMap.put(leaf, unionWork);
     tezWork.add(unionWork);
@@ -96,7 +98,7 @@ public class GenTezUtils {
     float minPartitionFactor = context.conf.getFloatVar(HiveConf.ConfVars.TEZ_MIN_PARTITION_FACTOR);
     long bytesPerReducer = context.conf.getLongVar(HiveConf.ConfVars.BYTESPERREDUCER);
 
-    ReduceWork reduceWork = new ReduceWork(Utilities.REDUCENAME + (++sequenceNumber));
+    ReduceWork reduceWork = new ReduceWork(Utilities.REDUCENAME + (sequencer.incrementAndGet()));
     LOG.debug("Adding reduce work (" + reduceWork.getName() + ") for " + root);
     reduceWork.setReducer(root);
     reduceWork.setNeedsTagging(GenMapRedUtils.needsTagging(reduceWork));
@@ -174,7 +176,7 @@ public class GenTezUtils {
   public MapWork createMapWork(GenTezProcContext context, Operator<?> root,
       TezWork tezWork, PrunedPartitionList partitions) throws SemanticException {
     assert root.getParentOperators().isEmpty();
-    MapWork mapWork = new MapWork(Utilities.MAPNAME + (++sequenceNumber));
+    MapWork mapWork = new MapWork(Utilities.MAPNAME + (sequencer.incrementAndGet()));
     LOG.debug("Adding map work (" + mapWork.getName() + ") for " + root);
 
     // map work starts with table scan operators

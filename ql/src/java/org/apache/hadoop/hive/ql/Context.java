@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.antlr.runtime.TokenRewriteStream;
 import org.apache.commons.logging.Log;
@@ -48,6 +49,7 @@ import org.apache.hadoop.hive.ql.lockmgr.HiveLock;
 import org.apache.hadoop.hive.ql.lockmgr.HiveLockManager;
 import org.apache.hadoop.hive.ql.lockmgr.HiveLockObj;
 import org.apache.hadoop.hive.ql.lockmgr.HiveTxnManager;
+import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.plan.LoadTableDesc;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.shims.ShimLoader;
@@ -107,6 +109,8 @@ public class Context {
   private AcidUtils.Operation acidOperation = AcidUtils.Operation.NOT_ACID;
 
   private boolean needLockMgr;
+
+  private AtomicInteger sequencer = new AtomicInteger();
 
   // Keep track of the mapping from load table desc to the output and the lock
   private final Map<LoadTableDesc, WriteEntity> loadTableOutputMap =
@@ -714,4 +718,17 @@ public class Context {
     this.cboSucceeded = cboSucceeded;
   }
 
+  private final Map<String, Table> cteTables = new HashMap<String, Table>();
+
+  public Table getVolatileTable(String cteName) {
+    return cteTables.get(cteName);
+  }
+
+  public void addVolatileTable(String cteName, Table table) {
+    cteTables.put(cteName, table);
+  }
+
+  public AtomicInteger getSequencer() {
+    return sequencer;
+  }
 }

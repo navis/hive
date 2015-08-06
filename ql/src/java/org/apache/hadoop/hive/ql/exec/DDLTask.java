@@ -112,7 +112,6 @@ import org.apache.hadoop.hive.ql.metadata.CheckResult;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.HiveMetaStoreChecker;
-import org.apache.hadoop.hive.ql.metadata.HiveStorageHandler;
 import org.apache.hadoop.hive.ql.metadata.HiveUtils;
 import org.apache.hadoop.hive.ql.metadata.InvalidTableException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
@@ -2979,8 +2978,8 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
       }
       PrincipalType ownerType = database.getOwnerType();
       formatter.showDatabaseDescription(outStream, database.getName(),
-          database.getDescription(), location,
-          database.getOwnerName(), (null == ownerType) ? null : ownerType.name(), params);
+              database.getDescription(), location,
+              database.getOwnerName(), (null == ownerType) ? null : ownerType.name(), params);
 
       outStream.close();
       outStream = null;
@@ -3886,10 +3885,14 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
     return true;
   }
 
+  private void validateSerDe(String serdeName) throws HiveException {
+    validateSerDe(serdeName, conf);
+  }
+
   /**
    * Check if the given serde is valid.
    */
-  private void validateSerDe(String serdeName) throws HiveException {
+  public static void validateSerDe(String serdeName, HiveConf conf) throws HiveException {
     try {
 
       Deserializer d = ReflectionUtil.newInstance(conf.getClassByName(serdeName).
@@ -3995,162 +3998,11 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
    */
   private int createTable(Hive db, CreateTableDesc crtTbl) throws HiveException {
     // create the table
-    Table tbl;
-    if (crtTbl.getDatabaseName() == null || (crtTbl.getTableName().contains("."))){
-      tbl = db.newTable(crtTbl.getTableName());
-    }else {
-      tbl = new Table(crtTbl.getDatabaseName(),crtTbl.getTableName());
-    }
-
-    if (crtTbl.getTblProps() != null) {
-      tbl.getTTable().getParameters().putAll(crtTbl.getTblProps());
-    }
-
-    if (crtTbl.getPartCols() != null) {
-      tbl.setPartCols(crtTbl.getPartCols());
-    }
-    if (crtTbl.getNumBuckets() != -1) {
-      tbl.setNumBuckets(crtTbl.getNumBuckets());
-    }
-
-    if (crtTbl.getStorageHandler() != null) {
-      tbl.setProperty(
-          org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.META_TABLE_STORAGE,
-          crtTbl.getStorageHandler());
-    }
-    HiveStorageHandler storageHandler = tbl.getStorageHandler();
-
-    /*
-     * We use LazySimpleSerDe by default.
-     *
-     * If the user didn't specify a SerDe, and any of the columns are not simple
-     * types, we will have to use DynamicSerDe instead.
-     */
-    if (crtTbl.getSerName() == null) {
-      if (storageHandler == null) {
-        LOG.info("Default to LazySimpleSerDe for table " + crtTbl.getTableName());
-        tbl.setSerializationLib(org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe.class.getName());
-      } else {
-        String serDeClassName = storageHandler.getSerDeClass().getName();
-        LOG.info("Use StorageHandler-supplied " + serDeClassName
-            + " for table " + crtTbl.getTableName());
-        tbl.setSerializationLib(serDeClassName);
-      }
-    } else {
-      // let's validate that the serde exists
-      validateSerDe(crtTbl.getSerName());
-      tbl.setSerializationLib(crtTbl.getSerName());
-    }
-
-    if (crtTbl.getFieldDelim() != null) {
-      tbl.setSerdeParam(serdeConstants.FIELD_DELIM, crtTbl.getFieldDelim());
-      tbl.setSerdeParam(serdeConstants.SERIALIZATION_FORMAT, crtTbl.getFieldDelim());
-    }
-    if (crtTbl.getFieldEscape() != null) {
-      tbl.setSerdeParam(serdeConstants.ESCAPE_CHAR, crtTbl.getFieldEscape());
-    }
-
-    if (crtTbl.getCollItemDelim() != null) {
-      tbl.setSerdeParam(serdeConstants.COLLECTION_DELIM, crtTbl.getCollItemDelim());
-    }
-    if (crtTbl.getMapKeyDelim() != null) {
-      tbl.setSerdeParam(serdeConstants.MAPKEY_DELIM, crtTbl.getMapKeyDelim());
-    }
-    if (crtTbl.getLineDelim() != null) {
-      tbl.setSerdeParam(serdeConstants.LINE_DELIM, crtTbl.getLineDelim());
-    }
-    if (crtTbl.getNullFormat() != null) {
-      tbl.setSerdeParam(serdeConstants.SERIALIZATION_NULL_FORMAT, crtTbl.getNullFormat());
-    }
-    if (crtTbl.getSerdeProps() != null) {
-      Iterator<Entry<String, String>> iter = crtTbl.getSerdeProps().entrySet()
-          .iterator();
-      while (iter.hasNext()) {
-        Entry<String, String> m = iter.next();
-        tbl.setSerdeParam(m.getKey(), m.getValue());
-      }
-    }
-
-    if (crtTbl.getCols() != null) {
-      tbl.setFields(crtTbl.getCols());
-    }
-    if (crtTbl.getBucketCols() != null) {
-      tbl.setBucketCols(crtTbl.getBucketCols());
-    }
-    if (crtTbl.getSortCols() != null) {
-      tbl.setSortCols(crtTbl.getSortCols());
-    }
-    if (crtTbl.getComment() != null) {
-      tbl.setProperty("comment", crtTbl.getComment());
-    }
-    if (crtTbl.getLocation() != null) {
-      tbl.setDataLocation(new Path(crtTbl.getLocation()));
-    }
-
-    if (crtTbl.getSkewedColNames() != null) {
-      tbl.setSkewedColNames(crtTbl.getSkewedColNames());
-    }
-    if (crtTbl.getSkewedColValues() != null) {
-      tbl.setSkewedColValues(crtTbl.getSkewedColValues());
-    }
-
-    tbl.getTTable().setTemporary(crtTbl.isTemporary());
-
-    tbl.setStoredAsSubDirectories(crtTbl.isStoredAsSubDirectories());
-
-    tbl.setInputFormatClass(crtTbl.getInputFormat());
-    tbl.setOutputFormatClass(crtTbl.getOutputFormat());
-
-    // only persist input/output format to metadata when it is explicitly specified.
-    // Otherwise, load lazily via StorageHandler at query time.
-    if (crtTbl.getInputFormat() != null && !crtTbl.getInputFormat().isEmpty()) {
-      tbl.getTTable().getSd().setInputFormat(tbl.getInputFormatClass().getName());
-    }
-    if (crtTbl.getOutputFormat() != null && !crtTbl.getOutputFormat().isEmpty()) {
-      tbl.getTTable().getSd().setOutputFormat(tbl.getOutputFormatClass().getName());
-    }
-
-    if (!Utilities.isDefaultNameNode(conf) && doesTableNeedLocation(tbl)) {
-      // If location is specified - ensure that it is a full qualified name
-      makeLocationQualified(tbl.getDbName(), tbl.getTTable().getSd(), tbl.getTableName());
-    }
-
-    if (crtTbl.isExternal()) {
-      tbl.setProperty("EXTERNAL", "TRUE");
-      tbl.setTableType(TableType.EXTERNAL_TABLE);
-    }
-
-    // If the sorted columns is a superset of bucketed columns, store this fact.
-    // It can be later used to
-    // optimize some group-by queries. Note that, the order does not matter as
-    // long as it in the first
-    // 'n' columns where 'n' is the length of the bucketed columns.
-    if ((tbl.getBucketCols() != null) && (tbl.getSortCols() != null)) {
-      List<String> bucketCols = tbl.getBucketCols();
-      List<Order> sortCols = tbl.getSortCols();
-
-      if ((sortCols.size() > 0) && (sortCols.size() >= bucketCols.size())) {
-        boolean found = true;
-
-        Iterator<String> iterBucketCols = bucketCols.iterator();
-        while (iterBucketCols.hasNext()) {
-          String bucketCol = iterBucketCols.next();
-          boolean colFound = false;
-          for (int i = 0; i < bucketCols.size(); i++) {
-            if (bucketCol.equals(sortCols.get(i).getCol())) {
-              colFound = true;
-              break;
-            }
-          }
-          if (colFound == false) {
-            found = false;
-            break;
-          }
-        }
-        if (found) {
-          tbl.setProperty("SORTBUCKETCOLSPREFIX", "TRUE");
-        }
-      }
+    Table tbl = crtTbl.toTable(conf);
+    LOG.warn("create table " + tbl.getDbName() + ":" + tbl.getTableName() + " = " + tbl.getDataLocation());
+    if (crtTbl.isVolatile()) {
+      tbl.checkValidity();
+      return 0;
     }
 
     // create the table
@@ -4298,7 +4150,7 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
 
     if (!Utilities.isDefaultNameNode(conf)) {
       // If location is specified - ensure that it is a full qualified name
-      makeLocationQualified(tbl.getDbName(), tbl.getTTable().getSd(), tbl.getTableName());
+      makeLocationQualified(tbl.getDbName(), tbl.getTTable().getSd(), tbl.getTableName(), conf);
     }
 
     // create the table
@@ -4495,7 +4347,7 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
    * @param name
    *          Object name.
    */
-  private void makeLocationQualified(String databaseName, StorageDescriptor sd, String name)
+  public static void makeLocationQualified(String databaseName, StorageDescriptor sd, String name, HiveConf conf)
       throws HiveException {
     Path path = null;
     if (!sd.isSetLocation())
@@ -4556,7 +4408,7 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
    * @param database
    *          Database.
    */
-  private void makeLocationQualified(Database database) throws HiveException {
+  public void makeLocationQualified(Database database) throws HiveException {
     if (database.isSetLocationUri()) {
       database.setLocationUri(Utilities.getQualifiedPath(conf, new Path(database.getLocationUri())));
     }
@@ -4568,7 +4420,7 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
     }
   }
 
-  private static boolean doesTableNeedLocation(Table tbl) {
+  public static boolean doesTableNeedLocation(Table tbl) {
     // If we are ok with breaking compatibility of existing 3rd party StorageHandlers,
     // this method could be moved to the HiveStorageHandler interface.
     boolean retval = true;

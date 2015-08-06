@@ -317,8 +317,10 @@ public class TezCompiler extends TaskCompiler {
       List<Task<MoveWork>> mvTask, Set<ReadEntity> inputs, Set<WriteEntity> outputs)
       throws SemanticException {
 
+    GenTezUtils utils = new GenTezUtils(pCtx.getContext().getSequencer());
+
     ParseContext tempParseContext = getParseContext(pCtx, rootTasks);
-    GenTezWork genTezWork = new GenTezWork(GenTezUtils.getUtils());
+    GenTezWork genTezWork = new GenTezWork(utils);
 
     GenTezProcContext procCtx = new GenTezProcContext(
         conf, tempParseContext, mvTask, rootTasks, inputs, outputs);
@@ -347,7 +349,7 @@ public class TezCompiler extends TaskCompiler {
 
     opRules.put(new RuleRegExp("Handle Potential Analyze Command",
         TableScanOperator.getOperatorName() + "%"),
-        new ProcessAnalyzeTable(GenTezUtils.getUtils()));
+        new ProcessAnalyzeTable(utils));
 
     opRules.put(new RuleRegExp("Remember union",
         UnionOperator.getOperatorName() + "%"),
@@ -367,19 +369,19 @@ public class TezCompiler extends TaskCompiler {
 
     // we need to clone some operator plans and remove union operators still
     for (BaseWork w: procCtx.workWithUnionOperators) {
-      GenTezUtils.getUtils().removeUnionOperators(conf, procCtx, w);
+      utils.removeUnionOperators(conf, procCtx, w);
     }
 
     // then we make sure the file sink operators are set up right
     for (FileSinkOperator fileSink: procCtx.fileSinkSet) {
-      GenTezUtils.getUtils().processFileSink(procCtx, fileSink);
+      utils.processFileSink(procCtx, fileSink);
     }
 
     // and finally we hook up any events that need to be sent to the tez AM
     LOG.debug("There are " + procCtx.eventOperatorSet.size() + " app master events.");
     for (AppMasterEventOperator event : procCtx.eventOperatorSet) {
       LOG.debug("Handling AppMasterEventOperator: " + event);
-      GenTezUtils.getUtils().processAppMasterEvent(procCtx, event);
+      utils.processAppMasterEvent(procCtx, event);
     }
   }
 
