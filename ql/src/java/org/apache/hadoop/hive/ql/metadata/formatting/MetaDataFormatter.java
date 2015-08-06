@@ -55,7 +55,7 @@ public interface MetaDataFormatter {
   /**
    * Show a list of tables.
    */
-  public void showTables(DataOutputStream out, Set<String> tables)
+  public void showTables(DataOutputStream out, List<String> tableNames, List<Table> tables)
       throws HiveException;
 
   /**

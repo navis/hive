@@ -1334,7 +1334,7 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
       HashMap<String, String> partSpec)
       throws SemanticException {
     HashMap<String, String> mapProp = getProps((ASTNode) (ast.getChild(0))
-        .getChild(0));
+            .getChild(0));
     AlterTableDesc alterTblDesc = new AlterTableDesc(
         AlterTableTypes.ADDSERDEPROPS);
     alterTblDesc.setProps(mapProp);
@@ -1382,7 +1382,7 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
 
     addInputsOutputsAlterTable(tableName, partSpec, alterTblDesc);
     rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(),
-        alterTblDesc), conf));
+            alterTblDesc), conf));
   }
 
   private void addInputsOutputsAlterTable(String tableName, Map<String, String> partSpec,
@@ -2194,36 +2194,28 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   private void analyzeShowTables(ASTNode ast) throws SemanticException {
-    ShowTablesDesc showTblsDesc;
     String dbName = SessionState.get().getCurrentDatabase();
     String tableNames = null;
 
-    if (ast.getChildCount() > 3) {
-      throw new SemanticException(ErrorMsg.GENERIC_ERROR.getMsg());
+    boolean withStats = false;
+    for (int i = 0 ; i < ast.getChildCount(); i++) {
+      ASTNode child = (ASTNode) ast.getChild(i);
+      String text = child.getText();
+      if (child.getType() == HiveParser.TOK_FROM) {
+        dbName = unescapeSQLString(text);
+        continue;
+      }
+      if (text.equalsIgnoreCase("statistics")) {
+        withStats = true;
+        continue;
+      }
+      if (tableNames == null) {
+        tableNames = unescapeSQLString(text);
+      } else {
+        dbName = unescapeSQLString(text);
+      }
     }
-
-    switch (ast.getChildCount()) {
-    case 1: // Uses a pattern
-      tableNames = unescapeSQLString(ast.getChild(0).getText());
-      showTblsDesc = new ShowTablesDesc(ctx.getResFile(), dbName, tableNames);
-      break;
-    case 2: // Specifies a DB
-      assert (ast.getChild(0).getType() == HiveParser.TOK_FROM);
-      dbName = unescapeIdentifier(ast.getChild(1).getText());
-      validateDatabase(dbName);
-      showTblsDesc = new ShowTablesDesc(ctx.getResFile(), dbName);
-      break;
-    case 3: // Uses a pattern and specifies a DB
-      assert (ast.getChild(0).getType() == HiveParser.TOK_FROM);
-      dbName = unescapeIdentifier(ast.getChild(1).getText());
-      tableNames = unescapeSQLString(ast.getChild(2).getText());
-      validateDatabase(dbName);
-      showTblsDesc = new ShowTablesDesc(ctx.getResFile(), dbName, tableNames);
-      break;
-    default: // No pattern or DB
-      showTblsDesc = new ShowTablesDesc(ctx.getResFile(), dbName);
-      break;
-    }
+    ShowTablesDesc showTblsDesc = new ShowTablesDesc(ctx.getResFile(), dbName, tableNames, withStats);
 
     rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(),
         showTblsDesc), conf));

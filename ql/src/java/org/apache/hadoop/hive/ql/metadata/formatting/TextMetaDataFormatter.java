@@ -25,16 +25,17 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.exec.Utilities;
@@ -97,21 +98,42 @@ class TextMetaDataFormatter implements MetaDataFormatter {
    * Show a list of tables.
    */
   @Override
-  public void showTables(DataOutputStream out, Set<String> tables)
-      throws HiveException
-      {
-    Iterator<String> iterTbls = tables.iterator();
-
+  public void showTables(DataOutputStream out, List<String> tableNames, List<Table> tables)
+      throws HiveException {
+    HiveConf sessionConf = SessionState.getSessionConf();
     try {
-      while (iterTbls.hasNext()) {
+      for (int i = 0; i < tableNames.size(); i++) {
         // create a row per table name
-        out.writeBytes(iterTbls.next());
+        out.writeBytes(tableNames.get(i));
+        if (tables == null) {
+          out.write(terminator);
+          continue;
+        }
+        out.write(separator);
+
+        Table table = tables.get(i);
+        TableType type = table.getTableType();
+        String tableType = table.isNonNative() ? "NON_NATIVE_TABLE" : type.name();
+
+        long length = -1;
+        String location = "";
+        if (!table.isView() && !table.isNonNative()) {
+          Path path = table.getDataLocation();
+          ContentSummary summary = FileSystem.get(sessionConf).getContentSummary(path);
+          length = summary.getLength();
+          location = path.toString();
+        }
+        out.writeBytes(tableType);
+        out.write(separator);
+        out.writeLong(length);
+        out.write(separator);
+        out.writeBytes(location);
         out.write(terminator);
       }
     } catch (IOException e) {
       throw new HiveException(e);
     }
-      }
+  }
 
   @Override
   public void describeTable(DataOutputStream outStream,  String colPath,

@@ -34,6 +34,9 @@ public class ShowTablesDesc extends DDLDesc implements Serializable {
   String pattern;
   String dbName;
   String resFile;
+
+  private boolean withStats;
+
   /**
    * table name for the result of show tables.
    */
@@ -41,14 +44,15 @@ public class ShowTablesDesc extends DDLDesc implements Serializable {
   /**
    * thrift ddl for the result of show tables.
    */
-  private static final String schema = "tab_name#string";
+  private static final String schema1 = "tab_name#string";
+  private static final String schema2 = "tab_name,tab_type,tab_length,data_location#string,string,long,string";
 
   public String getTable() {
     return table;
   }
 
   public String getSchema() {
-    return schema;
+    return withStats ? schema2 : schema1;
   }
 
   public ShowTablesDesc() {
@@ -75,10 +79,11 @@ public class ShowTablesDesc extends DDLDesc implements Serializable {
    * @param pattern
    *          names of tables to show
    */
-  public ShowTablesDesc(Path resFile, String dbName, String pattern) {
+  public ShowTablesDesc(Path resFile, String dbName, String pattern, boolean withStats) {
     this.resFile = resFile.toString();
     this.dbName = dbName;
     this.pattern = pattern;
+    this.withStats = withStats;
   }
 
   /**
@@ -127,5 +132,10 @@ public class ShowTablesDesc extends DDLDesc implements Serializable {
    */
   public void setDbName(String dbName) {
     this.dbName = dbName;
+  }
+
+  @Explain(displayName = "stats", displayOnlyOnTrue = true)
+  public boolean withStats() {
+    return withStats;
   }
 }

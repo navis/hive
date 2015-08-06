@@ -46,7 +46,6 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.regex.Pattern;
 
 import com.google.common.collect.Iterables;
 import org.apache.commons.lang.StringEscapeUtils;
@@ -2300,8 +2299,15 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
       FileSystem fs = resFile.getFileSystem(conf);
       outStream = fs.create(resFile);
 
-      SortedSet<String> sortedTbls = new TreeSet<String>(tbls);
-      formatter.showTables(outStream, sortedTbls);
+      List<String> tableNames = new ArrayList<>(new TreeSet<String>(tbls));
+      List<Table> tables = null;
+      if (showTbls.withStats()) {
+        tables = new ArrayList<Table>(tbls.size());
+        for (String tableName : tableNames) {
+          tables.add(db.getTable(dbName, tableName));
+        }
+      }
+      formatter.showTables(outStream, tableNames, tables);
       outStream.close();
       outStream = null;
     } catch (Exception e) {
