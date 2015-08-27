@@ -21,7 +21,6 @@ package org.apache.hadoop.hive.ql.plan;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -30,8 +29,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.HiveStatsUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.ql.exec.Task;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 
 /**
  * Conditional task resolution interface. This is invoked at run time to get the
@@ -317,11 +316,8 @@ public class ConditionalResolverMergeFiles implements ConditionalResolver,
 
   private PartitionDesc generateDPFullPartSpec(DynamicPartitionCtx dpCtx, FileStatus[] status,
       TableDesc tblDesc, int i) {
-    Map<String, String> fullPartSpec = new LinkedHashMap<String, String>(
-        dpCtx.getPartSpec());
-    Warehouse.makeSpecFromName(fullPartSpec, status[i].getPath());
-    PartitionDesc pDesc = new PartitionDesc(tblDesc, (LinkedHashMap) fullPartSpec);
-    return pDesc;
+    return new PartitionDesc(tblDesc,
+        Utilities.extractPartSpecFromPath(dpCtx.getPartSpec(), status[i].getPath()));
   }
 
   private void setupMapRedWork(HiveConf conf, MapWork mWork, long targetSize, long totalSize) {

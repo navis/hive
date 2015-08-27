@@ -1588,8 +1588,8 @@ private void constructOneLBLocationMap(FileStatus fSta,
           "partitions " + partPath + " is not a directory !";
 
         // generate a full partition specification
-        LinkedHashMap<String, String> fullPartSpec = new LinkedHashMap<String, String>(partSpec);
-        Warehouse.makeSpecFromName(fullPartSpec, partPath);
+        LinkedHashMap<String, String> fullPartSpec =
+            Utilities.extractPartSpecFromPath(partSpec, partPath);
         Partition newPartition = loadPartition(partPath, tbl, fullPartSpec, replace,
             holdDDLTime, true, listBucketingEnabled, false, isAcid);
         partitionsMap.put(fullPartSpec, newPartition);
