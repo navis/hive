@@ -28,6 +28,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.hive.service.cli.RowSet;
 import org.apache.hive.service.cli.RowSetFactory;
@@ -231,12 +233,24 @@ public class HiveStatement implements java.sql.Statement {
    * @see java.sql.Statement#execute(java.lang.String)
    */
 
+  private static final Pattern DQ_TO_BACKTICK = Pattern.compile("\"([^\"]+)\"");
+
   @Override
   public boolean execute(String sql) throws SQLException {
     checkConnection("execute");
 
     closeClientOperation();
     initFlags();
+
+    if (Boolean.valueOf(connection.getSessionValue("hive.jdbc.dquote.to.backtick", null))) {
+      Matcher matcher = DQ_TO_BACKTICK.matcher(sql);
+      StringBuffer builder = new StringBuffer();
+      while (matcher.find()) {
+        matcher.appendReplacement(builder, "`" + matcher.group(1) + "`");
+      }
+      matcher.appendTail(builder);
+      sql = builder.toString();
+    }
 
     TExecuteStatementReq execReq = new TExecuteStatementReq(sessHandle, sql);
     /**

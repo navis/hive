@@ -635,7 +635,7 @@ public class HiveConnection implements java.sql.Connection {
    * @param varDefault
    * @return
    */
-  private String getSessionValue(String varName, String varDefault) {
+  String getSessionValue(String varName, String varDefault) {
     String varValue = sessConfMap.get(varName);
     if ((varValue == null) || varValue.isEmpty()) {
       varValue = varDefault;
