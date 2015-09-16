@@ -49,6 +49,10 @@
           <groupId>org.apache.hive</groupId>
             <artifactId>hive-exec</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>javax.servlet</groupId>
+            <artifactId>servlet-api</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -117,7 +121,7 @@
         </dependency>
       </dependencies>
     </profile>
-   <profile>
+    <profile>
       <id>hadoop-2</id>
       <dependencies>
         <dependency>
@@ -144,7 +148,7 @@
         <directory>${basedir}/src/resources</directory>
       </resource>
     </resources>
-   <plugins>
+    <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
@@ -208,6 +212,8 @@
                   <exclude>org.antlr:*</exclude>
                   <exclude>org.slf4j:slf4j-log4j12</exclude>
                   <exclude>log4j:*</exclude>
+                  <exclude>javax.servlet:*</exclude>
+                  <exclude>javax.servlet.jsp:*</exclude>
                 </excludes>
               </artifactSet>
             </configuration>
