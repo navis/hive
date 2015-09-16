@@ -101,6 +101,9 @@ public class Utils {
     static final String SERVICE_DISCOVERY_MODE_NONE = "none";
     // Use ZooKeeper for indirection while using dynamic service discovery
     static final String SERVICE_DISCOVERY_MODE_ZOOKEEPER = "zooKeeper";
+    // Use RoundRobin for indirection while using dynamic service discovery
+    static final String SERVICE_DISCOVERY_MODE_RR = "RoundRobin";
+
     static final String ZOOKEEPER_NAMESPACE = "zooKeeperNamespace";
     // Default namespace value on ZooKeeper.
     // This value is used if the param "zooKeeperNamespace" is not specified in the JDBC Uri.
@@ -127,6 +130,10 @@ public class Utils {
     // Non-configurable params:
     // Currently supports JKS keystore format
     static final String SSL_TRUST_STORE_TYPE = "JKS";
+
+    static final String HIVE_JDBC_AUTO_RECONNECT = "autoReconnect";
+    static final String HIVE_JDBC_AUTO_RECONNECT_COUNT = "autoReconnectCount";
+    static final String HIVE_JDBC_AUTO_RECONNECT_INTERVAL = "autoReconnectInterval";
 
     private String host = null;
     private int port;
@@ -235,6 +242,12 @@ public class Utils {
     public void setCurrentHostZnodePath(String currentHostZnodePath) {
       this.currentHostZnodePath = currentHostZnodePath;
     }
+
+    public void update(Discovered discovered) {
+      jdbcUriString = discovered.jdbcUriString;
+      host = discovered.host;
+      port = discovered.port;
+    }
   }
 
   // Verify success or success_with_info status, else throw SQLException
@@ -332,13 +345,11 @@ public class Utils {
         // we have dbname followed by session parameters
         dbName = sessVars.substring(0, sessVars.indexOf(';'));
         sessVars = sessVars.substring(sessVars.indexOf(';') + 1);
-        if (sessVars != null) {
-          Matcher sessMatcher = pattern.matcher(sessVars);
-          while (sessMatcher.find()) {
-            if (connParams.getSessionVars().put(sessMatcher.group(1), sessMatcher.group(2)) != null) {
-              throw new JdbcUriParseException("Bad URL format: Multiple values for property "
-                  + sessMatcher.group(1));
-            }
+        Matcher sessMatcher = pattern.matcher(sessVars);
+        while (sessMatcher.find()) {
+          if (connParams.getSessionVars().put(sessMatcher.group(1), sessMatcher.group(2)) != null) {
+            throw new JdbcUriParseException("Bad URL format: Multiple values for property "
+                + sessMatcher.group(1));
           }
         }
       }

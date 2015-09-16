@@ -43,7 +43,6 @@ import org.apache.hive.service.cli.thrift.TExecuteStatementResp;
 import org.apache.hive.service.cli.thrift.TGetOperationStatusReq;
 import org.apache.hive.service.cli.thrift.TGetOperationStatusResp;
 import org.apache.hive.service.cli.thrift.TOperationHandle;
-import org.apache.hive.service.cli.thrift.TSessionHandle;
 import org.apache.hive.service.cli.thrift.TFetchResultsReq;
 import org.apache.hive.service.cli.thrift.TFetchResultsResp;
 import org.apache.hive.service.cli.thrift.TFetchOrientation;
@@ -56,7 +55,6 @@ public class HiveStatement implements java.sql.Statement {
   private final HiveConnection connection;
   private TCLIService.Iface client;
   private TOperationHandle stmtHandle = null;
-  private final TSessionHandle sessHandle;
   Map<String,String> sessConf = new HashMap<String,String>();
   private int fetchSize = 50;
   private boolean isScrollableResultset = false;
@@ -110,17 +108,18 @@ public class HiveStatement implements java.sql.Statement {
   // A fair reentrant lock
   private ReentrantLock transportLock = new ReentrantLock(true);
 
-  public HiveStatement(HiveConnection connection, TCLIService.Iface client,
-      TSessionHandle sessHandle) {
-    this(connection, client, sessHandle, false);
+  private List<StatementHook> statementHooks = new ArrayList<StatementHook>();
+
+  public HiveStatement(HiveConnection connection, TCLIService.Iface client) {
+    this(connection, client, false);
   }
 
   public HiveStatement(HiveConnection connection, TCLIService.Iface client,
-      TSessionHandle sessHandle, boolean isScrollableResultset) {
+      boolean isScrollableResultset) {
     this.connection = connection;
     this.client = client;
-    this.sessHandle = sessHandle;
     this.isScrollableResultset = isScrollableResultset;
+    statementHooks.add(connection);
   }
 
   /*
@@ -242,6 +241,7 @@ public class HiveStatement implements java.sql.Statement {
     closeClientOperation();
     initFlags();
 
+    // this can be in hook
     if (Boolean.valueOf(connection.getSessionValue("hive.jdbc.dquote.to.backtick", null))) {
       Matcher matcher = DQ_TO_BACKTICK.matcher(sql);
       StringBuffer builder = new StringBuffer();
@@ -252,7 +252,38 @@ public class HiveStatement implements java.sql.Statement {
       sql = builder.toString();
     }
 
-    TExecuteStatementReq execReq = new TExecuteStatementReq(sessHandle, sql);
+    for (StatementHook hook : statementHooks) {
+      hook.before(sql);
+    }
+
+    TGetOperationStatusResp statusResp;
+    try {
+      statusResp = executeAndGetStatus(sql);
+    } catch (SQLException e) {
+      for (StatementHook hook : statementHooks) {
+        hook.failed(sql, e);
+      }
+      throw e;
+    }
+
+    for (StatementHook hook : statementHooks) {
+      hook.after(sql, statusResp.getStatus());
+    }
+
+    // The query should be completed by now
+    if (!stmtHandle.isHasResultSet()) {
+      return false;
+    }
+    resultSet =  new HiveQueryResultSet.Builder(this).setClient(client)
+        .setStmtHandle(stmtHandle).setMaxRows(maxRows).setFetchSize(fetchSize)
+        .setScrollable(isScrollableResultset).setTransportLock(transportLock)
+        .build();
+    return true;
+  }
+
+  private TGetOperationStatusResp executeAndGetStatus(String sql) throws SQLException {
+
+    TExecuteStatementReq execReq = new TExecuteStatementReq(connection.getSessionHandle(), sql);
     /**
      * Run asynchronously whenever possible
      * Currently only a SQLOperation can be run asynchronously,
@@ -283,7 +314,7 @@ public class HiveStatement implements java.sql.Statement {
     TGetOperationStatusResp statusResp;
 
     // Poll on the operation status, till the operation is complete
-    while (!operationComplete) {
+    do {
       try {
         /**
          * For an async SQLOperation, GetOperationStatus will use the long polling approach
@@ -324,18 +355,10 @@ public class HiveStatement implements java.sql.Statement {
         isLogBeingGenerated = false;
         throw new SQLException(e.toString(), "08S01", e);
       }
-    }
-    isLogBeingGenerated = false;
+    } while (!operationComplete);
 
-    // The query should be completed by now
-    if (!stmtHandle.isHasResultSet()) {
-      return false;
-    }
-    resultSet =  new HiveQueryResultSet.Builder(this).setClient(client).setSessionHandle(sessHandle)
-        .setStmtHandle(stmtHandle).setMaxRows(maxRows).setFetchSize(fetchSize)
-        .setScrollable(isScrollableResultset).setTransportLock(transportLock)
-        .build();
-    return true;
+    isLogBeingGenerated = false;
+    return statusResp;
   }
 
   private void checkConnection(String action) throws SQLException {

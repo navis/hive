@@ -47,7 +47,6 @@ import org.apache.hive.service.cli.thrift.TGetTablesReq;
 import org.apache.hive.service.cli.thrift.TGetTablesResp;
 import org.apache.hive.service.cli.thrift.TGetTypeInfoReq;
 import org.apache.hive.service.cli.thrift.TGetTypeInfoResp;
-import org.apache.hive.service.cli.thrift.TSessionHandle;
 import org.apache.thrift.TException;
 
 /**
@@ -58,7 +57,6 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
 
   private final HiveConnection connection;
   private final TCLIService.Iface client;
-  private final TSessionHandle sessHandle;
   private static final String CATALOG_SEPARATOR = ".";
 
   private static final char SEARCH_STRING_ESCAPE = '\\';
@@ -72,11 +70,9 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
   /**
    *
    */
-  public HiveDatabaseMetaData(HiveConnection connection, TCLIService.Iface client,
-      TSessionHandle sessHandle) {
+  public HiveDatabaseMetaData(HiveConnection connection, TCLIService.Iface client) {
     this.connection = connection;
     this.client = client;
-    this.sessHandle = sessHandle;
   }
 
   public boolean allProceduresAreCallable() throws SQLException {
@@ -129,7 +125,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
     TGetCatalogsResp catalogResp;
 
     try {
-      catalogResp = client.GetCatalogs(new TGetCatalogsReq(sessHandle));
+      catalogResp = client.GetCatalogs(new TGetCatalogsReq(connection.getSessionHandle()));
     } catch (TException e) {
       throw new SQLException(e.getMessage(), "08S01", e);
     }
@@ -137,7 +133,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
 
     return new HiveQueryResultSet.Builder(connection)
     .setClient(client)
-    .setSessionHandle(sessHandle)
+    .setSessionHandle(connection.getSessionHandle())
     .setStmtHandle(catalogResp.getOperationHandle())
     .build();
   }
@@ -207,7 +203,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
       String tableNamePattern, String columnNamePattern) throws SQLException {
     TGetColumnsResp colResp;
     TGetColumnsReq colReq = new TGetColumnsReq();
-    colReq.setSessionHandle(sessHandle);
+    colReq.setSessionHandle(connection.getSessionHandle());
     colReq.setCatalogName(catalog);
     colReq.setSchemaName(schemaPattern);
     colReq.setTableName(tableNamePattern);
@@ -221,7 +217,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
     // build the resultset from response
     return new HiveQueryResultSet.Builder(connection)
     .setClient(client)
-    .setSessionHandle(sessHandle)
+    .setSessionHandle(connection.getSessionHandle())
     .setStmtHandle(colResp.getOperationHandle())
     .build();
   }
@@ -319,7 +315,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
       throws SQLException {
     TGetFunctionsResp funcResp;
     TGetFunctionsReq getFunctionsReq = new TGetFunctionsReq();
-    getFunctionsReq.setSessionHandle(sessHandle);
+    getFunctionsReq.setSessionHandle(connection.getSessionHandle());
     getFunctionsReq.setCatalogName(catalogName);
     getFunctionsReq.setSchemaName(schemaPattern);
     getFunctionsReq.setFunctionName(functionNamePattern);
@@ -333,7 +329,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
 
     return new HiveQueryResultSet.Builder(connection)
     .setClient(client)
-    .setSessionHandle(sessHandle)
+    .setSessionHandle(connection.getSessionHandle())
     .setStmtHandle(funcResp.getOperationHandle())
     .build();
   }
@@ -564,7 +560,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
     TGetSchemasResp schemaResp;
 
     TGetSchemasReq schemaReq = new TGetSchemasReq();
-    schemaReq.setSessionHandle(sessHandle);
+    schemaReq.setSessionHandle(connection.getSessionHandle());
     if (catalog != null) {
       schemaReq.setCatalogName(catalog);
     }
@@ -582,7 +578,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
 
     return new HiveQueryResultSet.Builder(connection)
     .setClient(client)
-    .setSessionHandle(sessHandle)
+    .setSessionHandle(connection.getSessionHandle())
     .setStmtHandle(schemaResp.getOperationHandle())
     .build();
   }
@@ -618,7 +614,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
     TGetTableTypesResp tableTypeResp;
 
     try {
-      tableTypeResp = client.GetTableTypes(new TGetTableTypesReq(sessHandle));
+      tableTypeResp = client.GetTableTypes(new TGetTableTypesReq(connection.getSessionHandle()));
     } catch (TException e) {
       throw new SQLException(e.getMessage(), "08S01", e);
     }
@@ -626,7 +622,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
 
     return new HiveQueryResultSet.Builder(connection)
     .setClient(client)
-    .setSessionHandle(sessHandle)
+    .setSessionHandle(connection.getSessionHandle())
     .setStmtHandle(tableTypeResp.getOperationHandle())
     .build();
   }
@@ -638,7 +634,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
       // if schemaPattern is null it means that the schemaPattern value should not be used to narrow the search
       schemaPattern = "%";
     }
-    TGetTablesReq getTableReq = new TGetTablesReq(sessHandle);
+    TGetTablesReq getTableReq = new TGetTablesReq(connection.getSessionHandle());
     getTableReq.setTableName(tableNamePattern);
 
     // TODO: need to set catalog parameter
@@ -659,7 +655,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
 
     return new HiveQueryResultSet.Builder(connection)
     .setClient(client)
-    .setSessionHandle(sessHandle)
+    .setSessionHandle(connection.getSessionHandle())
     .setStmtHandle(getTableResp.getOperationHandle())
     .build();
   }
@@ -706,7 +702,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
   public ResultSet getTypeInfo() throws SQLException {
     TGetTypeInfoResp getTypeInfoResp;
     TGetTypeInfoReq getTypeInfoReq = new TGetTypeInfoReq();
-    getTypeInfoReq.setSessionHandle(sessHandle);
+    getTypeInfoReq.setSessionHandle(connection.getSessionHandle());
     try {
       getTypeInfoResp = client.GetTypeInfo(getTypeInfoReq);
     } catch (TException e) {
@@ -715,7 +711,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
     Utils.verifySuccess(getTypeInfoResp.getStatus());
     return new HiveQueryResultSet.Builder(connection)
     .setClient(client)
-    .setSessionHandle(sessHandle)
+    .setSessionHandle(connection.getSessionHandle())
     .setStmtHandle(getTypeInfoResp.getOperationHandle())
     .build();
   }
@@ -1135,13 +1131,13 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
   }
 
   public static void main(String[] args) throws SQLException {
-    HiveDatabaseMetaData meta = new HiveDatabaseMetaData(null, null, null);
+    HiveDatabaseMetaData meta = new HiveDatabaseMetaData(null, null);
     System.out.println("DriverName: " + meta.getDriverName());
     System.out.println("DriverVersion: " + meta.getDriverVersion());
   }
 
   private TGetInfoResp getServerInfo(TGetInfoType type) throws SQLException {
-    TGetInfoReq req = new TGetInfoReq(sessHandle, type);
+    TGetInfoReq req = new TGetInfoReq(connection.getSessionHandle(), type);
     TGetInfoResp resp;
     try {
       resp = client.GetInfo(req);

@@ -44,7 +44,6 @@ import java.util.HashMap;
 import java.util.Scanner;
 
 import org.apache.hive.service.cli.thrift.TCLIService;
-import org.apache.hive.service.cli.thrift.TSessionHandle;
 
 /**
  * HivePreparedStatement.
@@ -58,9 +57,8 @@ public class HivePreparedStatement extends HiveStatement implements PreparedStat
    */
   private final HashMap<Integer, String> parameters=new HashMap<Integer, String>();
 
-  public HivePreparedStatement(HiveConnection connection, TCLIService.Iface client,
-      TSessionHandle sessHandle, String sql) {
-    super(connection, client, sessHandle);
+  public HivePreparedStatement(HiveConnection connection, TCLIService.Iface client, String sql) {
+    super(connection, client);
     this.sql = sql;
   }
 
@@ -132,7 +130,7 @@ public class HivePreparedStatement extends HiveStatement implements PreparedStat
       return sql;
     }
 
-    StringBuffer newSql = new StringBuffer(sql);
+    StringBuilder newSql = new StringBuilder(sql);
 
     int paramLoc = 1;
     while (getCharIndexFromSqlByParamLocation(sql, '?', paramLoc) > 0) {
