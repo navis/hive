@@ -169,6 +169,10 @@ public class HiveConnection implements java.sql.Connection, StatementHook {
       }
     }
 
+    String mode = getSessionValue(SERVICE_DISCOVERY_MODE, null);
+    discovery = createDiscovery(mode);
+    discovery.init(connParams);
+
     if (connParams.isEmbeddedMode()) {
       EmbeddedThriftBinaryCLIService embeddedClient = new EmbeddedThriftBinaryCLIService();
       embeddedClient.init(new HiveConf());
@@ -198,10 +202,6 @@ public class HiveConnection implements java.sql.Connection, StatementHook {
     supportedProtocols.add(TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6);
     supportedProtocols.add(TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V7);
     supportedProtocols.add(TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V8);
-
-    String mode = getSessionValue(SERVICE_DISCOVERY_MODE, null);
-    discovery = createDiscovery(mode);
-    discovery.init(connParams);
 
     // open client session
     openSession(client);
