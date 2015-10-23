@@ -31,28 +31,31 @@ import java.util.Arrays;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequest, TableStatsRequest._Fields>, java.io.Serializable, Cloneable {
-  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("TableStatsRequest");
+public class TableMeta implements org.apache.thrift.TBase<TableMeta, TableMeta._Fields>, java.io.Serializable, Cloneable {
+  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("TableMeta");
 
   private static final org.apache.thrift.protocol.TField DB_NAME_FIELD_DESC = new org.apache.thrift.protocol.TField("dbName", org.apache.thrift.protocol.TType.STRING, (short)1);
-  private static final org.apache.thrift.protocol.TField TBL_NAME_FIELD_DESC = new org.apache.thrift.protocol.TField("tblName", org.apache.thrift.protocol.TType.STRING, (short)2);
-  private static final org.apache.thrift.protocol.TField COL_NAMES_FIELD_DESC = new org.apache.thrift.protocol.TField("colNames", org.apache.thrift.protocol.TType.LIST, (short)3);
+  private static final org.apache.thrift.protocol.TField TABLE_NAME_FIELD_DESC = new org.apache.thrift.protocol.TField("tableName", org.apache.thrift.protocol.TType.STRING, (short)2);
+  private static final org.apache.thrift.protocol.TField TABLE_TYPE_FIELD_DESC = new org.apache.thrift.protocol.TField("tableType", org.apache.thrift.protocol.TType.STRING, (short)3);
+  private static final org.apache.thrift.protocol.TField COMMENTS_FIELD_DESC = new org.apache.thrift.protocol.TField("comments", org.apache.thrift.protocol.TType.STRING, (short)4);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
-    schemes.put(StandardScheme.class, new TableStatsRequestStandardSchemeFactory());
-    schemes.put(TupleScheme.class, new TableStatsRequestTupleSchemeFactory());
+    schemes.put(StandardScheme.class, new TableMetaStandardSchemeFactory());
+    schemes.put(TupleScheme.class, new TableMetaTupleSchemeFactory());
   }
 
   private String dbName; // required
-  private String tblName; // required
-  private List<String> colNames; // required
+  private String tableName; // required
+  private String tableType; // required
+  private String comments; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
     DB_NAME((short)1, "dbName"),
-    TBL_NAME((short)2, "tblName"),
-    COL_NAMES((short)3, "colNames");
+    TABLE_NAME((short)2, "tableName"),
+    TABLE_TYPE((short)3, "tableType"),
+    COMMENTS((short)4, "comments");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -69,10 +72,12 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
       switch(fieldId) {
         case 1: // DB_NAME
           return DB_NAME;
-        case 2: // TBL_NAME
-          return TBL_NAME;
-        case 3: // COL_NAMES
-          return COL_NAMES;
+        case 2: // TABLE_NAME
+          return TABLE_NAME;
+        case 3: // TABLE_TYPE
+          return TABLE_TYPE;
+        case 4: // COMMENTS
+          return COMMENTS;
         default:
           return null;
       }
@@ -113,62 +118,64 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
   }
 
   // isset id assignments
+  private _Fields optionals[] = {_Fields.COMMENTS};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
     tmpMap.put(_Fields.DB_NAME, new org.apache.thrift.meta_data.FieldMetaData("dbName", org.apache.thrift.TFieldRequirementType.REQUIRED, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
-    tmpMap.put(_Fields.TBL_NAME, new org.apache.thrift.meta_data.FieldMetaData("tblName", org.apache.thrift.TFieldRequirementType.REQUIRED, 
+    tmpMap.put(_Fields.TABLE_NAME, new org.apache.thrift.meta_data.FieldMetaData("tableName", org.apache.thrift.TFieldRequirementType.REQUIRED, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
-    tmpMap.put(_Fields.COL_NAMES, new org.apache.thrift.meta_data.FieldMetaData("colNames", org.apache.thrift.TFieldRequirementType.REQUIRED, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
+    tmpMap.put(_Fields.TABLE_TYPE, new org.apache.thrift.meta_data.FieldMetaData("tableType", org.apache.thrift.TFieldRequirementType.REQUIRED, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
+    tmpMap.put(_Fields.COMMENTS, new org.apache.thrift.meta_data.FieldMetaData("comments", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
-    org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(TableStatsRequest.class, metaDataMap);
+    org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(TableMeta.class, metaDataMap);
   }
 
-  public TableStatsRequest() {
+  public TableMeta() {
   }
 
-  public TableStatsRequest(
+  public TableMeta(
     String dbName,
-    String tblName,
-    List<String> colNames)
+    String tableName,
+    String tableType)
   {
     this();
     this.dbName = dbName;
-    this.tblName = tblName;
-    this.colNames = colNames;
+    this.tableName = tableName;
+    this.tableType = tableType;
   }
 
   /**
    * Performs a deep copy on <i>other</i>.
    */
-  public TableStatsRequest(TableStatsRequest other) {
+  public TableMeta(TableMeta other) {
     if (other.isSetDbName()) {
       this.dbName = other.dbName;
     }
-    if (other.isSetTblName()) {
-      this.tblName = other.tblName;
+    if (other.isSetTableName()) {
+      this.tableName = other.tableName;
     }
-    if (other.isSetColNames()) {
-      List<String> __this__colNames = new ArrayList<String>();
-      for (String other_element : other.colNames) {
-        __this__colNames.add(other_element);
-      }
-      this.colNames = __this__colNames;
+    if (other.isSetTableType()) {
+      this.tableType = other.tableType;
+    }
+    if (other.isSetComments()) {
+      this.comments = other.comments;
     }
   }
 
-  public TableStatsRequest deepCopy() {
-    return new TableStatsRequest(this);
+  public TableMeta deepCopy() {
+    return new TableMeta(this);
   }
 
   @Override
   public void clear() {
     this.dbName = null;
-    this.tblName = null;
-    this.colNames = null;
+    this.tableName = null;
+    this.tableType = null;
+    this.comments = null;
   }
 
   public String getDbName() {
@@ -194,64 +201,72 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
     }
   }
 
-  public String getTblName() {
-    return this.tblName;
+  public String getTableName() {
+    return this.tableName;
   }
 
-  public void setTblName(String tblName) {
-    this.tblName = tblName;
+  public void setTableName(String tableName) {
+    this.tableName = tableName;
   }
 
-  public void unsetTblName() {
-    this.tblName = null;
+  public void unsetTableName() {
+    this.tableName = null;
   }
 
-  /** Returns true if field tblName is set (has been assigned a value) and false otherwise */
-  public boolean isSetTblName() {
-    return this.tblName != null;
+  /** Returns true if field tableName is set (has been assigned a value) and false otherwise */
+  public boolean isSetTableName() {
+    return this.tableName != null;
   }
 
-  public void setTblNameIsSet(boolean value) {
+  public void setTableNameIsSet(boolean value) {
     if (!value) {
-      this.tblName = null;
+      this.tableName = null;
     }
   }
 
-  public int getColNamesSize() {
-    return (this.colNames == null) ? 0 : this.colNames.size();
+  public String getTableType() {
+    return this.tableType;
   }
 
-  public java.util.Iterator<String> getColNamesIterator() {
-    return (this.colNames == null) ? null : this.colNames.iterator();
+  public void setTableType(String tableType) {
+    this.tableType = tableType;
   }
 
-  public void addToColNames(String elem) {
-    if (this.colNames == null) {
-      this.colNames = new ArrayList<String>();
-    }
-    this.colNames.add(elem);
+  public void unsetTableType() {
+    this.tableType = null;
   }
 
-  public List<String> getColNames() {
-    return this.colNames;
+  /** Returns true if field tableType is set (has been assigned a value) and false otherwise */
+  public boolean isSetTableType() {
+    return this.tableType != null;
   }
 
-  public void setColNames(List<String> colNames) {
-    this.colNames = colNames;
-  }
-
-  public void unsetColNames() {
-    this.colNames = null;
-  }
-
-  /** Returns true if field colNames is set (has been assigned a value) and false otherwise */
-  public boolean isSetColNames() {
-    return this.colNames != null;
-  }
-
-  public void setColNamesIsSet(boolean value) {
+  public void setTableTypeIsSet(boolean value) {
     if (!value) {
-      this.colNames = null;
+      this.tableType = null;
+    }
+  }
+
+  public String getComments() {
+    return this.comments;
+  }
+
+  public void setComments(String comments) {
+    this.comments = comments;
+  }
+
+  public void unsetComments() {
+    this.comments = null;
+  }
+
+  /** Returns true if field comments is set (has been assigned a value) and false otherwise */
+  public boolean isSetComments() {
+    return this.comments != null;
+  }
+
+  public void setCommentsIsSet(boolean value) {
+    if (!value) {
+      this.comments = null;
     }
   }
 
@@ -265,19 +280,27 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
       }
       break;
 
-    case TBL_NAME:
+    case TABLE_NAME:
       if (value == null) {
-        unsetTblName();
+        unsetTableName();
       } else {
-        setTblName((String)value);
+        setTableName((String)value);
       }
       break;
 
-    case COL_NAMES:
+    case TABLE_TYPE:
       if (value == null) {
-        unsetColNames();
+        unsetTableType();
       } else {
-        setColNames((List<String>)value);
+        setTableType((String)value);
+      }
+      break;
+
+    case COMMENTS:
+      if (value == null) {
+        unsetComments();
+      } else {
+        setComments((String)value);
       }
       break;
 
@@ -289,11 +312,14 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
     case DB_NAME:
       return getDbName();
 
-    case TBL_NAME:
-      return getTblName();
+    case TABLE_NAME:
+      return getTableName();
 
-    case COL_NAMES:
-      return getColNames();
+    case TABLE_TYPE:
+      return getTableType();
+
+    case COMMENTS:
+      return getComments();
 
     }
     throw new IllegalStateException();
@@ -308,10 +334,12 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
     switch (field) {
     case DB_NAME:
       return isSetDbName();
-    case TBL_NAME:
-      return isSetTblName();
-    case COL_NAMES:
-      return isSetColNames();
+    case TABLE_NAME:
+      return isSetTableName();
+    case TABLE_TYPE:
+      return isSetTableType();
+    case COMMENTS:
+      return isSetComments();
     }
     throw new IllegalStateException();
   }
@@ -320,12 +348,12 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
   public boolean equals(Object that) {
     if (that == null)
       return false;
-    if (that instanceof TableStatsRequest)
-      return this.equals((TableStatsRequest)that);
+    if (that instanceof TableMeta)
+      return this.equals((TableMeta)that);
     return false;
   }
 
-  public boolean equals(TableStatsRequest that) {
+  public boolean equals(TableMeta that) {
     if (that == null)
       return false;
 
@@ -338,21 +366,30 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
         return false;
     }
 
-    boolean this_present_tblName = true && this.isSetTblName();
-    boolean that_present_tblName = true && that.isSetTblName();
-    if (this_present_tblName || that_present_tblName) {
-      if (!(this_present_tblName && that_present_tblName))
+    boolean this_present_tableName = true && this.isSetTableName();
+    boolean that_present_tableName = true && that.isSetTableName();
+    if (this_present_tableName || that_present_tableName) {
+      if (!(this_present_tableName && that_present_tableName))
         return false;
-      if (!this.tblName.equals(that.tblName))
+      if (!this.tableName.equals(that.tableName))
         return false;
     }
 
-    boolean this_present_colNames = true && this.isSetColNames();
-    boolean that_present_colNames = true && that.isSetColNames();
-    if (this_present_colNames || that_present_colNames) {
-      if (!(this_present_colNames && that_present_colNames))
+    boolean this_present_tableType = true && this.isSetTableType();
+    boolean that_present_tableType = true && that.isSetTableType();
+    if (this_present_tableType || that_present_tableType) {
+      if (!(this_present_tableType && that_present_tableType))
         return false;
-      if (!this.colNames.equals(that.colNames))
+      if (!this.tableType.equals(that.tableType))
+        return false;
+    }
+
+    boolean this_present_comments = true && this.isSetComments();
+    boolean that_present_comments = true && that.isSetComments();
+    if (this_present_comments || that_present_comments) {
+      if (!(this_present_comments && that_present_comments))
+        return false;
+      if (!this.comments.equals(that.comments))
         return false;
     }
 
@@ -368,26 +405,31 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
     if (present_dbName)
       builder.append(dbName);
 
-    boolean present_tblName = true && (isSetTblName());
-    builder.append(present_tblName);
-    if (present_tblName)
-      builder.append(tblName);
+    boolean present_tableName = true && (isSetTableName());
+    builder.append(present_tableName);
+    if (present_tableName)
+      builder.append(tableName);
 
-    boolean present_colNames = true && (isSetColNames());
-    builder.append(present_colNames);
-    if (present_colNames)
-      builder.append(colNames);
+    boolean present_tableType = true && (isSetTableType());
+    builder.append(present_tableType);
+    if (present_tableType)
+      builder.append(tableType);
+
+    boolean present_comments = true && (isSetComments());
+    builder.append(present_comments);
+    if (present_comments)
+      builder.append(comments);
 
     return builder.toHashCode();
   }
 
-  public int compareTo(TableStatsRequest other) {
+  public int compareTo(TableMeta other) {
     if (!getClass().equals(other.getClass())) {
       return getClass().getName().compareTo(other.getClass().getName());
     }
 
     int lastComparison = 0;
-    TableStatsRequest typedOther = (TableStatsRequest)other;
+    TableMeta typedOther = (TableMeta)other;
 
     lastComparison = Boolean.valueOf(isSetDbName()).compareTo(typedOther.isSetDbName());
     if (lastComparison != 0) {
@@ -399,22 +441,32 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
         return lastComparison;
       }
     }
-    lastComparison = Boolean.valueOf(isSetTblName()).compareTo(typedOther.isSetTblName());
+    lastComparison = Boolean.valueOf(isSetTableName()).compareTo(typedOther.isSetTableName());
     if (lastComparison != 0) {
       return lastComparison;
     }
-    if (isSetTblName()) {
-      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.tblName, typedOther.tblName);
+    if (isSetTableName()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.tableName, typedOther.tableName);
       if (lastComparison != 0) {
         return lastComparison;
       }
     }
-    lastComparison = Boolean.valueOf(isSetColNames()).compareTo(typedOther.isSetColNames());
+    lastComparison = Boolean.valueOf(isSetTableType()).compareTo(typedOther.isSetTableType());
     if (lastComparison != 0) {
       return lastComparison;
     }
-    if (isSetColNames()) {
-      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.colNames, typedOther.colNames);
+    if (isSetTableType()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.tableType, typedOther.tableType);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
+    lastComparison = Boolean.valueOf(isSetComments()).compareTo(typedOther.isSetComments());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetComments()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.comments, typedOther.comments);
       if (lastComparison != 0) {
         return lastComparison;
       }
@@ -436,7 +488,7 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder("TableStatsRequest(");
+    StringBuilder sb = new StringBuilder("TableMeta(");
     boolean first = true;
 
     sb.append("dbName:");
@@ -447,21 +499,31 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
     }
     first = false;
     if (!first) sb.append(", ");
-    sb.append("tblName:");
-    if (this.tblName == null) {
+    sb.append("tableName:");
+    if (this.tableName == null) {
       sb.append("null");
     } else {
-      sb.append(this.tblName);
+      sb.append(this.tableName);
     }
     first = false;
     if (!first) sb.append(", ");
-    sb.append("colNames:");
-    if (this.colNames == null) {
+    sb.append("tableType:");
+    if (this.tableType == null) {
       sb.append("null");
     } else {
-      sb.append(this.colNames);
+      sb.append(this.tableType);
     }
     first = false;
+    if (isSetComments()) {
+      if (!first) sb.append(", ");
+      sb.append("comments:");
+      if (this.comments == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.comments);
+      }
+      first = false;
+    }
     sb.append(")");
     return sb.toString();
   }
@@ -472,12 +534,12 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
       throw new org.apache.thrift.protocol.TProtocolException("Required field 'dbName' is unset! Struct:" + toString());
     }
 
-    if (!isSetTblName()) {
-      throw new org.apache.thrift.protocol.TProtocolException("Required field 'tblName' is unset! Struct:" + toString());
+    if (!isSetTableName()) {
+      throw new org.apache.thrift.protocol.TProtocolException("Required field 'tableName' is unset! Struct:" + toString());
     }
 
-    if (!isSetColNames()) {
-      throw new org.apache.thrift.protocol.TProtocolException("Required field 'colNames' is unset! Struct:" + toString());
+    if (!isSetTableType()) {
+      throw new org.apache.thrift.protocol.TProtocolException("Required field 'tableType' is unset! Struct:" + toString());
     }
 
     // check for sub-struct validity
@@ -499,15 +561,15 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
     }
   }
 
-  private static class TableStatsRequestStandardSchemeFactory implements SchemeFactory {
-    public TableStatsRequestStandardScheme getScheme() {
-      return new TableStatsRequestStandardScheme();
+  private static class TableMetaStandardSchemeFactory implements SchemeFactory {
+    public TableMetaStandardScheme getScheme() {
+      return new TableMetaStandardScheme();
     }
   }
 
-  private static class TableStatsRequestStandardScheme extends StandardScheme<TableStatsRequest> {
+  private static class TableMetaStandardScheme extends StandardScheme<TableMeta> {
 
-    public void read(org.apache.thrift.protocol.TProtocol iprot, TableStatsRequest struct) throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol iprot, TableMeta struct) throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TField schemeField;
       iprot.readStructBegin();
       while (true)
@@ -525,28 +587,26 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-          case 2: // TBL_NAME
+          case 2: // TABLE_NAME
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
-              struct.tblName = iprot.readString();
-              struct.setTblNameIsSet(true);
+              struct.tableName = iprot.readString();
+              struct.setTableNameIsSet(true);
             } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-          case 3: // COL_NAMES
-            if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
-              {
-                org.apache.thrift.protocol.TList _list356 = iprot.readListBegin();
-                struct.colNames = new ArrayList<String>(_list356.size);
-                for (int _i357 = 0; _i357 < _list356.size; ++_i357)
-                {
-                  String _elem358; // required
-                  _elem358 = iprot.readString();
-                  struct.colNames.add(_elem358);
-                }
-                iprot.readListEnd();
-              }
-              struct.setColNamesIsSet(true);
+          case 3: // TABLE_TYPE
+            if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
+              struct.tableType = iprot.readString();
+              struct.setTableTypeIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
+          case 4: // COMMENTS
+            if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
+              struct.comments = iprot.readString();
+              struct.setCommentsIsSet(true);
             } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
@@ -560,7 +620,7 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
       struct.validate();
     }
 
-    public void write(org.apache.thrift.protocol.TProtocol oprot, TableStatsRequest struct) throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol oprot, TableMeta struct) throws org.apache.thrift.TException {
       struct.validate();
 
       oprot.writeStructBegin(STRUCT_DESC);
@@ -569,22 +629,22 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
         oprot.writeString(struct.dbName);
         oprot.writeFieldEnd();
       }
-      if (struct.tblName != null) {
-        oprot.writeFieldBegin(TBL_NAME_FIELD_DESC);
-        oprot.writeString(struct.tblName);
+      if (struct.tableName != null) {
+        oprot.writeFieldBegin(TABLE_NAME_FIELD_DESC);
+        oprot.writeString(struct.tableName);
         oprot.writeFieldEnd();
       }
-      if (struct.colNames != null) {
-        oprot.writeFieldBegin(COL_NAMES_FIELD_DESC);
-        {
-          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, struct.colNames.size()));
-          for (String _iter359 : struct.colNames)
-          {
-            oprot.writeString(_iter359);
-          }
-          oprot.writeListEnd();
-        }
+      if (struct.tableType != null) {
+        oprot.writeFieldBegin(TABLE_TYPE_FIELD_DESC);
+        oprot.writeString(struct.tableType);
         oprot.writeFieldEnd();
+      }
+      if (struct.comments != null) {
+        if (struct.isSetComments()) {
+          oprot.writeFieldBegin(COMMENTS_FIELD_DESC);
+          oprot.writeString(struct.comments);
+          oprot.writeFieldEnd();
+        }
       }
       oprot.writeFieldStop();
       oprot.writeStructEnd();
@@ -592,46 +652,44 @@ public class TableStatsRequest implements org.apache.thrift.TBase<TableStatsRequ
 
   }
 
-  private static class TableStatsRequestTupleSchemeFactory implements SchemeFactory {
-    public TableStatsRequestTupleScheme getScheme() {
-      return new TableStatsRequestTupleScheme();
+  private static class TableMetaTupleSchemeFactory implements SchemeFactory {
+    public TableMetaTupleScheme getScheme() {
+      return new TableMetaTupleScheme();
     }
   }
 
-  private static class TableStatsRequestTupleScheme extends TupleScheme<TableStatsRequest> {
+  private static class TableMetaTupleScheme extends TupleScheme<TableMeta> {
 
     @Override
-    public void write(org.apache.thrift.protocol.TProtocol prot, TableStatsRequest struct) throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol prot, TableMeta struct) throws org.apache.thrift.TException {
       TTupleProtocol oprot = (TTupleProtocol) prot;
       oprot.writeString(struct.dbName);
-      oprot.writeString(struct.tblName);
-      {
-        oprot.writeI32(struct.colNames.size());
-        for (String _iter360 : struct.colNames)
-        {
-          oprot.writeString(_iter360);
-        }
+      oprot.writeString(struct.tableName);
+      oprot.writeString(struct.tableType);
+      BitSet optionals = new BitSet();
+      if (struct.isSetComments()) {
+        optionals.set(0);
+      }
+      oprot.writeBitSet(optionals, 1);
+      if (struct.isSetComments()) {
+        oprot.writeString(struct.comments);
       }
     }
 
     @Override
-    public void read(org.apache.thrift.protocol.TProtocol prot, TableStatsRequest struct) throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol prot, TableMeta struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
       struct.dbName = iprot.readString();
       struct.setDbNameIsSet(true);
-      struct.tblName = iprot.readString();
-      struct.setTblNameIsSet(true);
-      {
-        org.apache.thrift.protocol.TList _list361 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
-        struct.colNames = new ArrayList<String>(_list361.size);
-        for (int _i362 = 0; _i362 < _list361.size; ++_i362)
-        {
-          String _elem363; // required
-          _elem363 = iprot.readString();
-          struct.colNames.add(_elem363);
-        }
+      struct.tableName = iprot.readString();
+      struct.setTableNameIsSet(true);
+      struct.tableType = iprot.readString();
+      struct.setTableTypeIsSet(true);
+      BitSet incoming = iprot.readBitSet(1);
+      if (incoming.get(0)) {
+        struct.comments = iprot.readString();
+        struct.setCommentsIsSet(true);
       }
-      struct.setColNamesIsSet(true);
     }
   }
 

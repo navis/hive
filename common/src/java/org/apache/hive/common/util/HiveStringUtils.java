@@ -45,7 +45,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.classification.InterfaceAudience;
 import org.apache.hadoop.hive.common.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.util.StringUtils;
 
 /**
  * HiveStringUtils
@@ -111,14 +110,18 @@ public class HiveStringUtils {
    * @return An identical map with its strings interned.
    */
   public static Map<String, String> intern(Map<String, String> map) {
-    if(map == null) {
+    if (map == null) {
       return null;
     }
-    Map<String, String> newMap = new HashMap<String, String>(map.size());
-    for(Map.Entry<String, String> entry : map.entrySet()) {
-      newMap.put(intern(entry.getKey()), intern(entry.getValue()));
+    List<String[]> pair = new ArrayList<>(map.size());
+    for (Map.Entry<String, String> entry : map.entrySet()) {
+      pair.add(new String[]{intern(entry.getKey()), intern(entry.getValue())});
     }
-    return newMap;
+    map.clear();
+    for (String[] interned : pair) {
+      map.put(interned[0], interned[1]);
+    }
+    return map;
   }
 
   /**
